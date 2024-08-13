@@ -3,7 +3,7 @@ import pandas as pd
 import torch
 import plotly.graph_objs as go
 from sklearn.preprocessing import MinMaxScaler
-import numpy
+import numpy as np
 
 # Define the LSTM model class
 class LSTMModel(torch.nn.Module):
