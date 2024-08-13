@@ -23,12 +23,6 @@ def smooth_data(data):
     return data
 
 # Preprocess the data for prediction
-# def preprocess_data_for_prediction(data, scaler, look_back):
-#     data = smooth_data(data)
-#     scaled_data = scaler.transform(data['gr_n_smoothed'].values.reshape(-1, 1))
-#     X = [scaled_data[i:i+look_back] for i in range(len(scaled_data) - look_back)]
-#     return torch.from_numpy(np.array(X)).float()
-
 def preprocess_data_for_prediction(data, scaler, look_back):
     data = smooth_data(data)
     scaled_data = scaler.transform(data['gr_n_smoothed'].values.reshape(-1, 1))
@@ -73,7 +67,7 @@ if uploaded_file is not None:
         model.load_state_dict(torch.load('lstm_model.pth'))
 
         # Load the pre-fitted scaler
-        scaler = torch.load('scaler.pth')
+        scaler = joblib.load('scaler.pth')
         
         # Preprocess the data
         look_back = 10
