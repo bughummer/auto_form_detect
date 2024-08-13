@@ -23,11 +23,28 @@ def smooth_data(data):
     return data
 
 # Preprocess the data for prediction
+# def preprocess_data_for_prediction(data, scaler, look_back):
+#     data = smooth_data(data)
+#     scaled_data = scaler.transform(data['gr_n_smoothed'].values.reshape(-1, 1))
+#     X = [scaled_data[i:i+look_back] for i in range(len(scaled_data) - look_back)]
+#     return torch.from_numpy(np.array(X)).float()
+
 def preprocess_data_for_prediction(data, scaler, look_back):
     data = smooth_data(data)
     scaled_data = scaler.transform(data['gr_n_smoothed'].values.reshape(-1, 1))
     X = [scaled_data[i:i+look_back] for i in range(len(scaled_data) - look_back)]
-    return torch.from_numpy(np.array(X)).float()
+    
+    # Convert X to a NumPy array
+    X = np.array(X)
+    
+    # Debugging information
+    st.write("Shape of X:", X.shape)
+    st.write("First few elements of X:", X[:5])
+
+    if X.size == 0:
+        raise ValueError("Error: X is empty. Check if there is sufficient data after preprocessing.")
+    
+    return torch.from_numpy(X).float()
 
 # Predict using the LSTM model
 def predict_lstm(model, X, scaler):
