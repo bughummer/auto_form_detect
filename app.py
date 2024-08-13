@@ -29,10 +29,7 @@ def preprocess_data_for_prediction(data, scaler, look_back):
     
     # Convert X to a NumPy array
     X = np.array(X)
-    
-    # Debugging information
-    st.write("Shape of X:", X.shape)
-    
+        
     if X.size == 0:
         raise ValueError("Error: X is empty. Check if there is sufficient data after preprocessing.")
     
@@ -84,10 +81,6 @@ if uploaded_file is not None:
         
         # Use the correct depth column for plotting
         depth = well_data['tvd_scs'].values
-
-        # Visualization
-        st.write("LSTM Predictions (Inverse Scaled):")
-        st.write(lstm_predictions.flatten())
 
         fig = go.Figure()
 
