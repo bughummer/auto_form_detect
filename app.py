@@ -52,15 +52,14 @@ if uploaded_file is not None:
         well_data = well_data[well_data['wellname'] == selected_well]
         
         # Load the pre-trained LSTM model
-        lstm_units = 50
         model = LSTMModel()
         model.load_state_dict(torch.load('lstm_model.pth'))
 
         # Load the pre-fitted scaler
-        scaler = torch.load('scaler.pth')
+        scaler = joblib.load('scaler.pth')
         
         # Preprocess the data
-        look_back = 50
+        look_back = 10
         X = preprocess_data_for_prediction(well_data, scaler, look_back)
         
         # Predict using the LSTM model
@@ -80,6 +79,30 @@ if uploaded_file is not None:
 
         # Plot LSTM Predictions
         fig.add_trace(go.Scatter(x=well_data.index[look_back:], y=lstm_predictions.flatten(), name='LSTM Predictions', line=dict(color='orange')))
+
+        # Highlight zones of interest
+        zones_below_combined = []
+        in_zone = False
+        for i in range(len(lstm_predictions)):
+            if well_data['gr_n_smoothed'].iloc[i + look_back] < lstm_predictions[i]:
+                if not in_zone:
+                    start_depth = well_data.index[i + look_back]
+                    in_zone = True
+            else:
+                if in_zone:
+                    end_depth = well_data.index[i + look_back - 1]
+                    zones_below_combined.append((start_depth, end_depth))
+                    in_zone = False
+
+        # Plot zones of interest
+        for start, end in zones_below_combined:
+            fig.add_vrect(x0=start, x1=end, fillcolor="yellow", opacity=0.3, line_width=0)
+
+        # Final layout adjustments
+        fig.update_layout(title=f'Gamma Ray Log Predictions for {selected_well}',
+                          xaxis_title='Depth',
+                          yaxis_title='GR Value',
+                          template='plotly_white')
 
         # Show plot in the Streamlit app
         st.plotly_chart(fig)
