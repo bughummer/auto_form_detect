@@ -3,7 +3,6 @@ import pandas as pd
 import torch
 import plotly.graph_objs as go
 import numpy as np
-from scipy.stats import zscore
 
 # Define the LSTM model class
 class LSTMModel(torch.nn.Module):
@@ -16,42 +15,28 @@ class LSTMModel(torch.nn.Module):
         lstm_out, _ = self.lstm(x)
         return self.linear(lstm_out[:, -1])
 
-# Function to remove outliers using Z-score
-def remove_outliers(data, z_thresh=3):
-    data['zscore'] = zscore(data['gr_n'])
-    data = data[(data['zscore'].abs() <= z_thresh)]
-    data = data.drop(columns=['zscore'])  # Drop the zscore column after filtering
-    return data
-
 # Function to smooth data using Savitzky-Golay filter
 def smooth_data(data):
     from scipy.signal import savgol_filter
     data['gr_n_smoothed'] = savgol_filter(data['gr_n'], 51, 2)
-    st.write(data.head())
     return data
 
 # Preprocess the data for prediction
 def preprocess_data_for_prediction(data, scaler, look_back):
-    data = remove_outliers(data)  # Remove outliers before smoothing
     data = smooth_data(data)
     scaled_data = scaler.transform(data['gr_n_smoothed'].values.reshape(-1, 1))
     X = [scaled_data[i:i+look_back] for i in range(len(scaled_data) - look_back)]
     
     # Convert X to a NumPy array
     X = np.array(X)
-    
-    # Debugging information
-    st.write("Shape of X:", X.shape)
-    
+        
     if X.size == 0:
         raise ValueError("Error: X is empty. Check if there is sufficient data after preprocessing.")
     
     # Check if X is 3-dimensional
     if len(X.shape) != 3:
         raise ValueError(f"Error: X should be 3-dimensional (samples, look_back, 1). Got shape={X.shape} instead.")
-    
-    st.write("First few elements of X:", X[:5, :, 0])  # Displaying the first 5 sequences
-    
+        
     return torch.from_numpy(X).float()
 
 # Predict using the LSTM model
@@ -95,47 +80,43 @@ if uploaded_file is not None:
         # Use the correct depth column for plotting
         depth = well_data['tvd_scs'].values
 
-        # Check length consistency
-        if len(depth) != len(well_data['gr_n_smoothed']):
-            st.error("Length mismatch between depth and smoothed GR data.")
-        else:
-            fig = go.Figure()
+        fig = go.Figure()
 
-            # Plot original GR curve (vertical)
-            fig.add_trace(go.Scatter(y=depth, x=well_data['gr_n'], name='Original GR', line=dict(color='gray')))
+        # Plot original GR curve (vertical)
+        fig.add_trace(go.Scatter(y=depth, x=well_data['gr_n'], name='Original GR', line=dict(color='gray')))
 
-            # Plot smoothed GR curve (vertical)
-            fig.add_trace(go.Scatter(y=depth, x=well_data['gr_n_smoothed'], name='Smoothed GR', line=dict(color='blue')))
+        # Plot smoothed GR curve (vertical)
+        fig.add_trace(go.Scatter(y=depth, x=well_data['gr_n_smoothed'], name='Smoothed GR', line=dict(color='blue')))
 
-            # Plot LSTM Predictions (vertical)
-            fig.add_trace(go.Scatter(y=depth[look_back:], x=lstm_predictions.flatten(), name='LSTM Predictions', line=dict(color='orange')))
+        # Plot LSTM Predictions (vertical)
+        fig.add_trace(go.Scatter(y=depth[look_back:], x=lstm_predictions.flatten(), name='LSTM Predictions', line=dict(color='orange')))
 
-            # Highlight zones of interest (vertical)
-            zones_below_combined = []
-            in_zone = False
-            for i in range(len(lstm_predictions)):
-                if well_data['gr_n_smoothed'].iloc[i + look_back] < lstm_predictions[i]:
-                    if not in_zone:
-                        start_depth = depth[i + look_back]
-                        in_zone = True
-                else:
-                    if in_zone:
-                        end_depth = depth[i + look_back - 1]
-                        zones_below_combined.append((start_depth, end_depth))
-                        in_zone = False
+        # Highlight zones of interest (vertical)
+        zones_below_combined = []
+        in_zone = False
+        for i in range(len(lstm_predictions)):
+            if well_data['gr_n_smoothed'].iloc[i + look_back] < lstm_predictions[i]:
+                if not in_zone:
+                    start_depth = depth[i + look_back]
+                    in_zone = True
+            else:
+                if in_zone:
+                    end_depth = depth[i + look_back - 1]
+                    zones_below_combined.append((start_depth, end_depth))
+                    in_zone = False
 
-            # Plot zones of interest (vertical)
-            for start, end in zones_below_combined:
-                fig.add_hrect(y0=start, y1=end, fillcolor="yellow", opacity=0.3, line_width=0)
+        # Plot zones of interest (vertical)
+        for start, end in zones_below_combined:
+            fig.add_hrect(y0=start, y1=end, fillcolor="yellow", opacity=0.3, line_width=0)
 
-            # Final layout adjustments for vertical plot
-            fig.update_layout(title=f'Gamma Ray Log Predictions for {selected_well}',
-                              yaxis_title='Depth',
-                              xaxis_title='GR Value',
-                              template='plotly_white',
-                              yaxis_autorange='reversed',  # Ensure depth increases downwards
-                              height=1000,  # Make the plot longer
-                              width=600)  # Make the plot narrower
+        # Final layout adjustments for vertical plot
+        fig.update_layout(title=f'Gamma Ray Log Predictions for {selected_well}',
+                          yaxis_title='Depth',
+                          xaxis_title='GR Value',
+                          template='plotly_white',
+                          yaxis_autorange='reversed',  # Ensure depth increases downwards
+                          height=1500,  # Make the plot longer
+                          width=400)  # Make the plot narrower
 
-            # Show plot in the Streamlit app
-            st.plotly_chart(fig)
+        # Show plot in the Streamlit app
+        st.plotly_chart(fig)
