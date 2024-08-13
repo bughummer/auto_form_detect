@@ -34,12 +34,18 @@ def preprocess_data_for_prediction(data, scaler, look_back):
     
     # Debugging information
     st.write("Shape of X:", X.shape)
-    st.write("First few elements of X:", X[:5])
-
+    
     if X.size == 0:
         raise ValueError("Error: X is empty. Check if there is sufficient data after preprocessing.")
     
+    # Check if X is 2-dimensional
+    if len(X.shape) != 3:
+        raise ValueError(f"Error: X should be 3-dimensional (samples, look_back, 1). Got shape={X.shape} instead.")
+    
+    st.write("First few elements of X:", X[:5, :, 0])  # Displaying the first 5 sequences
+    
     return torch.from_numpy(X).float()
+
 
 # Predict using the LSTM model
 def predict_lstm(model, X, scaler):
