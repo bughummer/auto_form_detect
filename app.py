@@ -3,7 +3,7 @@ import pandas as pd
 import torch
 import plotly.graph_objs as go
 from sklearn.preprocessing import MinMaxScaler
-import numpy as np
+import numpy
 
 # Define the LSTM model class
 class LSTMModel(torch.nn.Module):
@@ -37,7 +37,7 @@ def preprocess_data_for_prediction(data, scaler, look_back):
     if X.size == 0:
         raise ValueError("Error: X is empty. Check if there is sufficient data after preprocessing.")
     
-    # Check if X is 2-dimensional
+    # Check if X is 3-dimensional
     if len(X.shape) != 3:
         raise ValueError(f"Error: X should be 3-dimensional (samples, look_back, 1). Got shape={X.shape} instead.")
     
@@ -81,6 +81,9 @@ if uploaded_file is not None:
         # Predict using the LSTM model
         lstm_predictions = predict_lstm(model, X, scaler)
         
+        # Use the correct depth column for plotting
+        depth = well_data['tvd_scs'].values
+
         # Visualization
         st.write("LSTM Predictions (Inverse Scaled):")
         st.write(lstm_predictions.flatten())
@@ -88,13 +91,13 @@ if uploaded_file is not None:
         fig = go.Figure()
 
         # Plot original GR curve (vertical)
-        fig.add_trace(go.Scatter(y=well_data.index, x=well_data['gr_n'], name='Original GR', line=dict(color='gray')))
+        fig.add_trace(go.Scatter(y=depth, x=well_data['gr_n'], name='Original GR', line=dict(color='gray')))
 
         # Plot smoothed GR curve (vertical)
-        fig.add_trace(go.Scatter(y=well_data.index, x=well_data['gr_n_smoothed'], name='Smoothed GR', line=dict(color='blue')))
+        fig.add_trace(go.Scatter(y=depth, x=well_data['gr_n_smoothed'], name='Smoothed GR', line=dict(color='blue')))
 
         # Plot LSTM Predictions (vertical)
-        fig.add_trace(go.Scatter(y=well_data.index[look_back:], x=lstm_predictions.flatten(), name='LSTM Predictions', line=dict(color='orange')))
+        fig.add_trace(go.Scatter(y=depth[look_back:], x=lstm_predictions.flatten(), name='LSTM Predictions', line=dict(color='orange')))
 
         # Highlight zones of interest (vertical)
         zones_below_combined = []
@@ -102,11 +105,11 @@ if uploaded_file is not None:
         for i in range(len(lstm_predictions)):
             if well_data['gr_n_smoothed'].iloc[i + look_back] < lstm_predictions[i]:
                 if not in_zone:
-                    start_depth = well_data.index[i + look_back]
+                    start_depth = depth[i + look_back]
                     in_zone = True
             else:
                 if in_zone:
-                    end_depth = well_data.index[i + look_back - 1]
+                    end_depth = depth[i + look_back - 1]
                     zones_below_combined.append((start_depth, end_depth))
                     in_zone = False
 
