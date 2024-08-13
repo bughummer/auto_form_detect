@@ -52,6 +52,7 @@ if uploaded_file is not None:
         well_data = well_data[well_data['wellname'] == selected_well]
         
         # Load the pre-trained LSTM model
+        lstm_units = 50
         model = LSTMModel()
         model.load_state_dict(torch.load('lstm_model.pth'))
 
@@ -59,7 +60,7 @@ if uploaded_file is not None:
         scaler = torch.load('scaler.pth')
         
         # Preprocess the data
-        look_back = 10
+        look_back = 50
         X = preprocess_data_for_prediction(well_data, scaler, look_back)
         
         # Predict using the LSTM model
