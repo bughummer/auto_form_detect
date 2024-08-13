@@ -3,8 +3,7 @@ import pandas as pd
 import torch
 import plotly.graph_objs as go
 from sklearn.preprocessing import MinMaxScaler
-import numpy as np
-
+import joblib
 
 # Define the LSTM model class
 class LSTMModel(torch.nn.Module):
@@ -45,7 +44,6 @@ def preprocess_data_for_prediction(data, scaler, look_back):
     st.write("First few elements of X:", X[:5, :, 0])  # Displaying the first 5 sequences
     
     return torch.from_numpy(X).float()
-
 
 # Predict using the LSTM model
 def predict_lstm(model, X, scaler):
@@ -89,16 +87,16 @@ if uploaded_file is not None:
 
         fig = go.Figure()
 
-        # Plot original GR curve
-        fig.add_trace(go.Scatter(x=well_data.index, y=well_data['gr_n'], name='Original GR', line=dict(color='gray')))
+        # Plot original GR curve (vertical)
+        fig.add_trace(go.Scatter(y=well_data.index, x=well_data['gr_n'], name='Original GR', line=dict(color='gray')))
 
-        # Plot smoothed GR curve
-        fig.add_trace(go.Scatter(x=well_data.index, y=well_data['gr_n_smoothed'], name='Smoothed GR', line=dict(color='blue')))
+        # Plot smoothed GR curve (vertical)
+        fig.add_trace(go.Scatter(y=well_data.index, x=well_data['gr_n_smoothed'], name='Smoothed GR', line=dict(color='blue')))
 
-        # Plot LSTM Predictions
-        fig.add_trace(go.Scatter(x=well_data.index[look_back:], y=lstm_predictions.flatten(), name='LSTM Predictions', line=dict(color='orange')))
+        # Plot LSTM Predictions (vertical)
+        fig.add_trace(go.Scatter(y=well_data.index[look_back:], x=lstm_predictions.flatten(), name='LSTM Predictions', line=dict(color='orange')))
 
-        # Highlight zones of interest
+        # Highlight zones of interest (vertical)
         zones_below_combined = []
         in_zone = False
         for i in range(len(lstm_predictions)):
@@ -112,15 +110,16 @@ if uploaded_file is not None:
                     zones_below_combined.append((start_depth, end_depth))
                     in_zone = False
 
-        # Plot zones of interest
+        # Plot zones of interest (vertical)
         for start, end in zones_below_combined:
-            fig.add_vrect(x0=start, x1=end, fillcolor="yellow", opacity=0.3, line_width=0)
+            fig.add_hrect(y0=start, y1=end, fillcolor="yellow", opacity=0.3, line_width=0)
 
-        # Final layout adjustments
+        # Final layout adjustments for vertical plot
         fig.update_layout(title=f'Gamma Ray Log Predictions for {selected_well}',
-                          xaxis_title='Depth',
-                          yaxis_title='GR Value',
-                          template='plotly_white')
+                          yaxis_title='Depth',
+                          xaxis_title='GR Value',
+                          template='plotly_white',
+                          yaxis_autorange='reversed')  # Ensure depth increases downwards
 
         # Show plot in the Streamlit app
         st.plotly_chart(fig)
