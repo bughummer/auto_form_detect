@@ -27,6 +27,7 @@ def remove_outliers(data, z_thresh=3):
 def smooth_data(data):
     from scipy.signal import savgol_filter
     data['gr_n_smoothed'] = savgol_filter(data['gr_n'], 51, 2)
+    st.write(data.head())
     return data
 
 # Preprocess the data for prediction
