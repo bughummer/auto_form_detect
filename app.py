@@ -115,8 +115,8 @@ if uploaded_file is not None:
                           xaxis_title='GR Value',
                           template='plotly_white',
                           yaxis_autorange='reversed',  # Ensure depth increases downwards
-                          height=1000,  # Make the plot longer
-                          width=600)  # Make the plot narrower
+                          height=1500,  # Make the plot longer
+                          width=400)  # Make the plot narrower
 
         # Show plot in the Streamlit app
         st.plotly_chart(fig)
