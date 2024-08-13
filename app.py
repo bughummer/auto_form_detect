@@ -56,7 +56,7 @@ if uploaded_file is not None:
         model.load_state_dict(torch.load('lstm_model.pth'))
 
         # Load the pre-fitted scaler
-        scaler = joblib.load('scaler.pth')
+        scaler = torch.load('scaler.pth')
         
         # Preprocess the data
         look_back = 10
