@@ -3,7 +3,6 @@ import pandas as pd
 import torch
 import plotly.graph_objs as go
 from sklearn.preprocessing import MinMaxScaler
-import joblib
 
 # Define the LSTM model class
 class LSTMModel(torch.nn.Module):
@@ -67,7 +66,7 @@ if uploaded_file is not None:
         model.load_state_dict(torch.load('lstm_model.pth'))
 
         # Load the pre-fitted scaler
-        scaler = joblib.load('scaler.pth')
+        scaler = torch.load('scaler.pth')
         
         # Preprocess the data
         look_back = 10
