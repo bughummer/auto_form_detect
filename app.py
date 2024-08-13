@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import torch
 import plotly.graph_objs as go
-from sklearn.preprocessing import MinMaxScaler
 import numpy as np
 
 # Define the LSTM model class
@@ -52,6 +51,8 @@ def predict_lstm(model, X, scaler):
     return scaler.inverse_transform(y_pred)
 
 # Streamlit app code
+st.set_page_config(layout="wide")  # Set the page to wide mode
+
 st.title("LSTM Prediction for Gamma Ray Logs")
 
 # Step 1: File upload
@@ -71,7 +72,7 @@ if uploaded_file is not None:
         model = LSTMModel()
         model.load_state_dict(torch.load('lstm_model.pth'))
 
-        # Load the pre-fitted scaler
+        # Load the pre-fitted scaler using torch.load
         scaler = torch.load('scaler.pth')
         
         # Preprocess the data
@@ -122,7 +123,9 @@ if uploaded_file is not None:
                           yaxis_title='Depth',
                           xaxis_title='GR Value',
                           template='plotly_white',
-                          yaxis_autorange='reversed')  # Ensure depth increases downwards
+                          yaxis_autorange='reversed',  # Ensure depth increases downwards
+                          height=1000,  # Make the plot longer
+                          width=600)  # Make the plot narrower
 
         # Show plot in the Streamlit app
         st.plotly_chart(fig)
