@@ -184,11 +184,14 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
                           y0=start_depth, y1=end_depth,
                           fillcolor=color, opacity=color_intensity, line_width=0,
                           row=1, col=index+1)
-            fig.add_annotation(
-                x=(combined_predictions.max()), y=(start_depth + end_depth) / 2,
-                text=hover_text, showarrow=False, yshift=10, bgcolor="yellow", opacity=0.5,
+            fig.add_trace(go.Scatter(
+                x=[0], y=[(start_depth + end_depth) / 2],
+                mode='text', text=[hover_text],
+                textposition='middle right', showlegend=False,
+                hoverinfo='text',
+                hovertext=hover_text,
                 row=1, col=index+1
-            )
+            ))
 
     # Convert the results list to a DataFrame
     results_df = pd.DataFrame(results_list)
