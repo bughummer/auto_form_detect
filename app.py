@@ -62,7 +62,7 @@ def predict_lstm(model, X, scaler):
 def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=10, thickness_threshold=3):
     fig = go.Figure()
 
-    for well_name in selected_wells:
+    for index, well_name in enumerate(selected_wells):
         # Load the data
         well_data = df[df['wellname'] == well_name].copy()
 
@@ -119,40 +119,33 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
 
             merged_zones.append((current_start, current_end, current_diff))
 
-        # Add subplot for this well
-        well_plot = go.Figure()
+        # Calculate x-offset for each well
+        x_offset = index * 100  # Adjust this value based on your data's depth range for better spacing
 
         # Plot smoothed data
-        well_plot.add_trace(go.Scatter(x=well_data['tvd_scs'], y=well_data_smoothed, mode='lines', name='Smoothed Data', line=dict(color='blue')))
+        fig.add_trace(go.Scatter(x=well_data['tvd_scs'] + x_offset, y=well_data_smoothed, mode='lines', name=f'{well_name} - Smoothed Data', line=dict(color='blue')))
 
         # Plot LSTM predictions
-        well_plot.add_trace(go.Scatter(x=well_data['tvd_scs'][look_back:], y=lstm_predictions.flatten(), mode='lines', name='LSTM Predictions', line=dict(color='orange')))
+        fig.add_trace(go.Scatter(x=well_data['tvd_scs'][look_back:] + x_offset, y=lstm_predictions.flatten(), mode='lines', name=f'{well_name} - LSTM Predictions', line=dict(color='orange')))
 
         # Plot combined cutoff
-        well_plot.add_trace(go.Scatter(x=well_data['tvd_scs'][look_back:], y=combined_predictions, mode='lines', name='Combined Cutoff', line=dict(color='red', dash='dash')))
+        fig.add_trace(go.Scatter(x=well_data['tvd_scs'][look_back:] + x_offset, y=combined_predictions, mode='lines', name=f'{well_name} - Combined Cutoff', line=dict(color='red', dash='dash')))
 
         # Highlight zones of interest with varying colors based on the difference
         for start, end, diff in merged_zones:
             color_intensity = min(max(diff / max([d[2] for d in merged_zones]), 0.1), 1)  # Scale between 0.1 and 1 for better visibility
             color = 'yellow'
-            well_plot.add_vrect(x0=start, x1=end, fillcolor=color, opacity=color_intensity, line_width=0)
+            fig.add_vrect(x0=start + x_offset, x1=end + x_offset, fillcolor=color, opacity=color_intensity, line_width=0)
 
-        # Add this well's plot to the main figure
-        fig.add_trace(well_plot.data[0])  # Smoothed data
-        fig.add_trace(well_plot.data[1])  # LSTM predictions
-        fig.add_trace(well_plot.data[2])  # Combined cutoff
-        for rect in well_plot.layout.shapes:  # Add rectangles for zones of interest
-            fig.add_shape(rect)
+    # Final layout
+    fig.update_layout(
+        title=f'Gamma Ray Log Predictions for Selected Wells',
+        xaxis_title='Depth (with offset for each well)',
+        yaxis_title='Gamma Ray (gr_n)',
+        template='plotly_white',
+        showlegend=True
+    )
 
-        # Adjust layout for each subplot
-        fig.update_layout(
-            title=f'Gamma Ray Log Predictions for {well_name}',
-            xaxis_title='Depth',
-            yaxis_title='Gamma Ray (gr_n)',
-            template='plotly_white'
-        )
-
-    # Show the complete figure with all selected wells
     st.plotly_chart(fig)
 
 # Streamlit app interface
