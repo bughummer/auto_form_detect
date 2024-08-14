@@ -6,7 +6,7 @@ import numpy as np
 from scipy.signal import savgol_filter
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
-
+ 
 # Define the LSTM model class
 class LSTMModel(nn.Module):
     def __init__(self, input_size=1, hidden_layer_size=50, output_size=1):
