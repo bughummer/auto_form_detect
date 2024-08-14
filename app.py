@@ -6,6 +6,7 @@ from sklearn.preprocessing import MinMaxScaler
 from scipy.signal import savgol_filter
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
+import streamlit as st
 
 # Define the LSTM model class
 class LSTMModel(nn.Module):
