@@ -66,10 +66,10 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
         return
 
     num_wells = len(selected_wells)
-    column_widths = [1.0 / num_wells] * num_wells
+    column_widths = 0.2
 
     # Create subplots with one column per well, and shared y-axis for depth
-    fig = make_subplots(rows=1, cols=num_wells, shared_yaxes=True, subplot_titles=selected_wells, column_widths=column_widths)
+    fig = make_subplots(rows=1, cols=num_wells, shared_yaxes=False, subplot_titles=selected_wells, column_widths=column_widths)
 
     for index, well_name in enumerate(selected_wells):
         # Load the data
@@ -145,7 +145,7 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
             color_intensity = 0.5
             color = 'yellow'
             fig.add_shape(type="rect",
-                          x0=well_data_smoothed.min(), x1=well_data_smoothed.max(),  # Use the range of the GR log
+                          x0=0, 150,  # Use the range of the GR log
                           y0=start, y1=end,
                           fillcolor=color, opacity=color_intensity, line_width=0,
                           row=1, col=index+1)
