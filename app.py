@@ -65,6 +65,7 @@ def main(df, selected_wells, look_back, mean_multiplier, merge_threshold, thickn
     all_combined_predictions = []
     all_depths = []
     all_well_names = []
+    all_zones_of_interest = []
     
     # Load the trained LSTM model and scaler
     lstm_units = 50
@@ -93,6 +94,39 @@ def main(df, selected_wells, look_back, mean_multiplier, merge_threshold, thickn
         # Combine LSTM predictions and mean cutoff
         combined_predictions = np.minimum(lstm_predictions.flatten(), mean_cutoff)
 
+        # Identify zones of interest
+        zones_of_interest = []
+        in_zone = False
+        for i in range(len(combined_predictions)):
+            if well_data_smoothed[i + look_back] < combined_predictions[i]:
+                if not in_zone:
+                    start_depth = well_data['tvd_scs'].iloc[i + look_back]
+                    in_zone = True
+            else:
+                if in_zone:
+                    end_depth = well_data['tvd_scs'].iloc[i + look_back - 1]
+                    thickness = end_depth - start_depth
+                    difference = np.abs(combined_predictions[i - 1] - well_data_smoothed[i + look_back - 1])
+                    if thickness >= thickness_threshold:  # Only consider zones with sufficient thickness
+                        zones_of_interest.append((start_depth, end_depth, difference, thickness))
+                    in_zone = False
+
+        # Merge close zones
+        merged_zones = []
+        if zones_of_interest:
+            current_start, current_end, current_diff, _ = zones_of_interest[0]
+
+            for start_depth, end_depth, diff, thickness in zones_of_interest[1:]:
+                if start_depth - current_end <= merge_threshold:
+                    current_end = end_depth
+                    current_diff = max(current_diff, diff)  # Max difference in the zone
+                else:
+                    merged_zones.append((current_start, current_end, current_diff))
+                    current_start, current_end, current_diff = start_depth, end_depth, diff
+
+            merged_zones.append((current_start, current_end, current_diff))
+        all_zones_of_interest.append(merged_zones)
+
         # Store the data for plotting
         all_well_data_smoothed.append(well_data_smoothed)
         all_lstm_predictions.append(lstm_predictions.flatten())
@@ -108,6 +142,12 @@ def main(df, selected_wells, look_back, mean_multiplier, merge_threshold, thickn
         fig.add_trace(go.Scatter(x=all_depths[i], y=all_well_data_smoothed[i], mode='lines', name=f'{well_name} Smoothed Data', line=dict(color='blue')))
         fig.add_trace(go.Scatter(x=all_depths[i], y=all_lstm_predictions[i], mode='lines', name=f'{well_name} LSTM Predictions', line=dict(color='orange')))
         fig.add_trace(go.Scatter(x=all_depths[i], y=all_combined_predictions[i], mode='lines', name=f'{well_name} Combined Cutoff', line=dict(color='red', dash='dash')))
+
+        # Highlight zones of interest with varying colors based on the difference
+        for start, end, diff in all_zones_of_interest[i]:
+            color_intensity = min(max(diff / max([d[2] for d in all_zones_of_interest[i]]), 0.1), 1)  # Scale between 0.1 and 1 for better visibility
+            color = f'rgba(255, 255, 0, {color_intensity})'
+            fig.add_vrect(x0=start, x1=end, fillcolor=color, opacity=0.3, line_width=0)
 
     # Final layout
     fig.update_layout(title=f'Gamma Ray Log Predictions for Selected Wells: {", ".join(all_well_names)}',
