@@ -145,7 +145,8 @@ def main(df, well_name, look_back=50, mean_multiplier=1, merge_threshold=10, thi
 # Streamlit app interface
 def streamlit_app():
     st.title("LSTM Prediction for Gamma Ray Logs")
-
+    mean_multiplier = 1
+    look_back  =  50
     # File upload
     uploaded_file = st.file_uploader("Upload your CSV file", type="csv")
     if uploaded_file is not None:
