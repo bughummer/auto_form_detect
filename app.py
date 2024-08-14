@@ -173,11 +173,13 @@ def main(df, selected_wells, look_back=50, mean_multiplier=1, merge_threshold=10
         for start_md, end_md, start_depth, end_depth, diff in merged_zones:
             color_intensity = 0.5
             color = 'yellow'
+            hover_text = f"Start TVD: {start_depth:.2f}<br>End TVD: {end_depth:.2f}<br>Thickness: {end_depth - start_depth:.2f} meters"
             fig.add_shape(type="rect",
                           x0=0, x1=150,   # Use the range of the GR log
                           y0=start_depth, y1=end_depth,
                           fillcolor=color, opacity=color_intensity, line_width=0,
-                          row=1, col=index+1)
+                          row=1, col=index+1,
+                          hovertext=hover_text, hoverinfo="text")
 
     # Convert the results list to a DataFrame
     results_df = pd.DataFrame(results_list)
@@ -190,12 +192,12 @@ def main(df, selected_wells, look_back=50, mean_multiplier=1, merge_threshold=10
         yaxis_title='Depth',
         template='plotly_white',
         showlegend=True,
-        yaxis_autorange='reversed'  # Depth increases downwards
+        yaxis_autorange='reversed'
     )
 
     st.plotly_chart(fig)
 
-    # Display the DataFrame with the formation information
+    # Display the results DataFrame
     st.write("Detected Formations")
     st.dataframe(results_df)
 
