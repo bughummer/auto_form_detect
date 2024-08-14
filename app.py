@@ -130,7 +130,7 @@ def main(df, well_name, look_back=50, mean_multiplier=1, merge_threshold=10, thi
 
     # Highlight zones of interest with varying colors based on the difference
     for start, end, diff in merged_zones:
-        color_intensity = min(max(diff / max([d[2] for d in merged_zones]), 0.1), 1)  # Scale between 0.1 and 1 for better visibility
+        color_intensity = 1
         color = 'yellow'
         fig.add_vrect(x0=start, x1=end, fillcolor=color, opacity=color_intensity, line_width=0)
 
