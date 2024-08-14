@@ -1,66 +1,3 @@
-import streamlit as st
-import torch
-import torch.nn as nn
-import pandas as pd
-import numpy as np
-from scipy.signal import savgol_filter
-import plotly.graph_objs as go
-from plotly.subplots import make_subplots
-
-# Define the LSTM model class
-class LSTMModel(nn.Module):
-    def __init__(self, input_size=1, hidden_layer_size=50, output_size=1):
-        super(LSTMModel, self).__init__()
-        self.hidden_layer_size = hidden_layer_size
-        self.lstm = nn.LSTM(input_size, hidden_layer_size, batch_first=True)
-        self.linear = nn.Linear(hidden_layer_size, output_size)
-
-    def forward(self, input_seq):
-        batch_size = input_seq.size(0)
-        self.hidden_cell = (torch.zeros(1, batch_size, self.hidden_layer_size),
-                            torch.zeros(1, batch_size, self.hidden_layer_size))
-        lstm_out, self.hidden_cell = self.lstm(input_seq, self.hidden_cell)
-        predictions = self.linear(lstm_out[:, -1])
-        return predictions
-
-# Function to remove outliers based on z-score
-def remove_outliers(data, z_thresh=3):
-    mean = np.mean(data)
-    std = np.std(data)
-    z_scores = np.abs((data - mean) / std)
-    return data[z_scores < z_thresh]
-
-# Function to smooth data using Savitzky-Golay filter
-def smooth_data_savgol(data, window_length=51, polyorder=2):
-    smoothed_data = savgol_filter(data, window_length=window_length, polyorder=polyorder)
-    return smoothed_data
-
-# Function to preprocess data for prediction
-def preprocess_data_for_prediction(data, scaler, look_back):
-    data_scaled = scaler.transform(data.reshape(-1, 1))
-    
-    def create_dataset(dataset, look_back):
-        X = []
-        for i in range(len(dataset) - look_back - 1):
-            a = dataset[i:(i + look_back), 0]
-            X.append(a)
-        return np.array(X)
-
-    X = create_dataset(data_scaled, look_back)
-    X = np.reshape(X, (X.shape[0], X.shape[1], 1))
-    
-    return torch.tensor(X, dtype=torch.float32)
-
-# Function to predict with LSTM and inverse scale the predictions
-def predict_lstm(model, X, scaler):
-    model.eval()
-    with torch.no_grad():
-        predictions = model(X).numpy()
-    predictions_inverse = scaler.inverse_transform(predictions)
-    return predictions_inverse
-
-# Main function to load model, make predictions, identify zones of interest, and visualize the results
-# Main function to load model, make predictions, identify zones of interest, and visualize the results
 def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=10, thickness_threshold=3):
     # Create subplots with one column per well
     fig = make_subplots(rows=1, cols=len(selected_wells), shared_yaxes=True, subplot_titles=selected_wells)
@@ -134,7 +71,7 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
         fig.add_trace(go.Scatter(x=combined_predictions, y=well_data['tvd_scs'][look_back:], mode='lines', name=f'{well_name} - Combined Cutoff', line=dict(color='red', dash='dash')),
                       row=1, col=index+1)
 
-        # Highlight zones of interest using add_shape instead of add_vrect
+        # Highlight zones of interest using add_shape
         for start, end, diff in merged_zones:
             color_intensity = min(max(diff / max([d[2] for d in merged_zones]), 0.1), 1)  # Scale between 0.1 and 1 for better visibility
             color = 'yellow'
@@ -142,7 +79,7 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
                           x0=0, x1=1,  # Use the full width of the subplot
                           y0=start, y1=end,
                           fillcolor=color, opacity=color_intensity, line_width=0,
-                          xref=f'x{index+1} domain', yref=f'y domain')  # Reference the specific subplot's domain
+                          row=1, col=index+1)  # Specify the row and column directly
 
     # Final layout
     fig.update_layout(
@@ -155,7 +92,6 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
     )
 
     st.plotly_chart(fig)
-
 
 # Streamlit app interface
 def streamlit_app():
