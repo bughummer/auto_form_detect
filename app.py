@@ -77,7 +77,7 @@ def main(df, selected_wells, look_back=50, mean_multiplier=1, merge_threshold=10
         fig = make_subplots(rows=1, cols=2, shared_yaxes=True, column_widths=[0.25, 0.75])
     elif num_wells == 2:
     # For 2 wells, add an invisible subplot to control the width
-        fig = make_subplots(rows=1, cols=2, shared_yaxes=True, column_widths=[0.5, 0.5])
+        fig = make_subplots(rows=1, cols=3, shared_yaxes=True, column_widths=[0.33, 0.33, 0.34])
     elif num_wells == 3:
         # For 3 wells, assign a fixed width to each subplot
         fig = make_subplots(rows=1, cols=num_wells, shared_yaxes=True, column_widths=[0.25] * num_wells)
