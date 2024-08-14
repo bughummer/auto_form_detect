@@ -105,37 +105,40 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
         combined_predictions = np.minimum(lstm_predictions.flatten(), mean_cutoff)
 
         # Identify zones of interest
-        zones_of_interest = []
-        in_zone = False
-        for i in range(len(combined_predictions)):
-            if well_data_smoothed[i + look_back] < combined_predictions[i]:
-                if not in_zone:
-                    start_depth = well_data['tvd_scs'].iloc[i + look_back]
-                    in_zone = True
+    zones_of_interest = []
+    in_zone = False
+    for i in range(len(combined_predictions)):
+        if well_data_smoothed[i + look_back] < combined_predictions[i]:
+            if not in_zone:
+                start_depth = well_data['tvd_scs'].iloc[i + look_back]
+                start_md = well_data['md'].iloc[i + look_back]  # Get the start MD value
+                in_zone = True
+        else:
+            if in_zone:
+                end_depth = well_data['tvd_scs'].iloc[i + look_back - 1]
+                end_md = well_data['md'].iloc[i + look_back - 1]  # Get the end MD value
+                thickness = end_depth - start_depth
+                difference = np.abs(combined_predictions[i - 1] - well_data_smoothed[i + look_back - 1])
+                if thickness >= thickness_threshold:  # Filter out zones thinner than the given threshold
+                    zones_of_interest.append((start_md, end_md, start_depth, end_depth, difference, thickness))
+                in_zone = False
+
+    # merging formations that are close to each other and are basically one thick formations
+    merged_zones = []
+    if zones_of_interest:
+        current_start_md, current_end_md, current_start_depth, current_end_depth, current_diff, _ = zones_of_interest[0]
+
+        for start_md, end_md, start_depth, end_depth, diff, thickness in zones_of_interest[1:]:
+            if start_depth - current_end_depth <= merge_threshold:
+                current_end_depth = end_depth
+                current_end_md = end_md
+                current_diff = max(current_diff, diff)  # Finding max difference in the zone
             else:
-                if in_zone:
-                    end_depth = well_data['tvd_scs'].iloc[i + look_back - 1]
-                    thickness = end_depth - start_depth
-                    difference = np.abs(combined_predictions[i - 1] - well_data_smoothed[i + look_back - 1])
-                    if thickness >= thickness_threshold:  # Only consider zones with sufficient thickness
-                        zones_of_interest.append((start_depth, end_depth, difference, thickness))
-                    in_zone = False
+                merged_zones.append((current_start_md, current_end_md, current_start_depth, current_end_depth, current_diff))
+                current_start_md, current_end_md, current_start_depth, current_end_depth, current_diff = start_md, end_md, start_depth, end_depth, diff
 
-        # Merge close zones
-        merged_zones = []
-        if zones_of_interest:
-            current_start, current_end, current_diff, _ = zones_of_interest[0]
-
-            for start_depth, end_depth, diff, thickness in zones_of_interest[1:]:
-                if start_depth - current_end <= merge_threshold:
-                    current_end = end_depth
-                    current_diff = max(current_diff, diff)  # Max difference in the zone
-                else:
-                    merged_zones.append((current_start, current_end, current_diff))
-                    current_start, current_end, current_diff = start_depth, end_depth, diff
-
-            merged_zones.append((current_start, current_end, current_diff))
-
+        merged_zones.append((current_start_md, current_end_md, current_start_depth, current_end_depth, current_diff))
+        
         # Plot smoothed data
         fig.add_trace(go.Scatter(
             x=well_data_smoothed, y=well_data['tvd_scs'], mode='lines',
@@ -176,6 +179,15 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
     )
 
     st.plotly_chart(fig)
+
+    print("\nDetected Formations:")
+    for idx, (start_md, end_md, start_depth, end_depth, diff) in enumerate(merged_zones):
+        thickness = end_depth - start_depth
+        print(f"Formation {idx + 1}:")
+        print(f"  MD Range: {start_md:.2f} - {end_md:.2f}")
+        print(f"  TVD SCS Range: {start_depth:.2f} - {end_depth:.2f}")
+        print(f"  Thickness: {thickness:.2f} meters")
+        print("-" * 40)
 
 # Streamlit app interface
 def streamlit_app():
