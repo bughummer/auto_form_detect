@@ -11,7 +11,7 @@ class LSTMModel(torch.nn.Module):
         super(LSTMModel, self).__init__()
         self.hidden_layer_size = hidden_layer_size
         self.lstm = torch.nn.LSTM(input_size, hidden_layer_size, batch_first=True)
-        self.linear = torch.nn.Linear(hidden_size, output_size)
+        self.linear = torch.nn.Linear(hidden_layer_size, output_size)
 
     def forward(self, input_seq):
         batch_size = input_seq.size(0)
@@ -66,16 +66,16 @@ def main(df, selected_wells, look_back, mean_multiplier, merge_threshold, thickn
     all_depths = []
     all_well_names = []
     
+    # Load the trained LSTM model and scaler
+    lstm_units = 50
+    model = LSTMModel(input_size=1, hidden_layer_size=lstm_units, output_size=1)
+    model.load_state_dict(torch.load('lstm_model.pth'))
+    scaler = torch.load('scaler.pth')
+
     # Loop over selected wells
     for well_name in selected_wells:
         # Load the data for the current well
         well_data = df[df['wellname'] == well_name].copy()
-
-        # Load the trained LSTM model and scaler
-        lstm_units = 50
-        model = LSTMModel(input_size=1, hidden_layer_size=lstm_units, output_size=1)
-        model.load_state_dict(torch.load('lstm_model.pth'))
-        scaler = torch.load('scaler.pth')
 
         # Remove outliers and smooth the data
         well_data_cleaned = remove_outliers(well_data['gr_n'].values)
