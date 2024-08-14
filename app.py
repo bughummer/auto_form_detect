@@ -60,10 +60,12 @@ def predict_lstm(model, X, scaler):
     return predictions_inverse
 
 # Main function to load model, make predictions, identify zones of interest, and visualize the results
-# Main function to load model, make predictions, identify zones of interest, and visualize the results
-# Main function to load model, make predictions, identify zones of interest, and visualize the results
 def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=10, thickness_threshold=3):
-    # Create subplots with one column per well
+    if not selected_wells:
+        st.warning("Please select at least one well.")
+        return
+
+    # Create subplots with one column per well, and shared y-axis for depth
     fig = make_subplots(rows=1, cols=len(selected_wells), shared_yaxes=True, subplot_titles=selected_wells)
 
     for index, well_name in enumerate(selected_wells):
@@ -143,11 +145,12 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
                           x0=0, x1=1,  # Use the full width of the subplot
                           y0=start, y1=end,
                           fillcolor=color, opacity=color_intensity, line_width=0,
-                          row=1, col=index+1)  # Specify the row and column directly
+                          xref=f'x{index+1} domain', yref='y')
 
     # Final layout
     fig.update_layout(
         title=f'Gamma Ray Log Predictions for Selected Wells',
+        height=1400,  # Make the plot longer
         xaxis_title='Gamma Ray (gr_n)',
         yaxis_title='Depth',
         template='plotly_white',
@@ -156,8 +159,6 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
     )
 
     st.plotly_chart(fig)
-
-
 
 # Streamlit app interface
 def streamlit_app():
