@@ -1,4 +1,4 @@
-import streamlit as st 
+import streamlit as st
 import torch
 import torch.nn as nn
 import pandas as pd
@@ -59,112 +59,124 @@ def predict_lstm(model, X, scaler):
     return predictions_inverse
 
 # Main function to load model, make predictions, identify zones of interest, and visualize the results
-def main(df, well_name, look_back=50, mean_multiplier=1, merge_threshold=10, thickness_threshold=1):
-    # Load the data
-    well_data = df[df['wellname'] == well_name].copy()
-
-    # Load the trained LSTM model and scaler
-    model = LSTMModel(input_size=1, hidden_layer_size=50, output_size=1)
-    model.load_state_dict(torch.load('lstm_model.pth'))
-    scaler = torch.load('scaler.pth')
-
-    # Remove outliers and smooth the data
-    well_data_cleaned = remove_outliers(well_data['gr_n'].values)
-    well_data_smoothed = smooth_data_savgol(well_data_cleaned)
-
-    # Preprocess data for prediction
-    X = preprocess_data_for_prediction(well_data_smoothed, scaler, look_back)
-
-    # Make LSTM predictions
-    lstm_predictions = predict_lstm(model, X, scaler)
-
-    # Calculate mean-based cutoff
-    mean_cutoff = np.mean(well_data_smoothed) * mean_multiplier
-
-    # Combine LSTM predictions and mean cutoff
-    combined_predictions = np.minimum(lstm_predictions.flatten(), mean_cutoff)
-
-    # Identify zones of interest
-    zones_of_interest = []
-    in_zone = False
-    for i in range(len(combined_predictions)):
-        if well_data_smoothed[i + look_back] < combined_predictions[i]:
-            if not in_zone:
-                start_depth = well_data['tvd_scs'].iloc[i + look_back]
-                in_zone = True
-        else:
-            if in_zone:
-                end_depth = well_data['tvd_scs'].iloc[i + look_back - 1]
-                thickness = end_depth - start_depth
-                difference = np.abs(combined_predictions[i - 1] - well_data_smoothed[i + look_back - 1])
-                if thickness >= thickness_threshold:  # Only consider zones with sufficient thickness
-                    zones_of_interest.append((start_depth, end_depth, difference, thickness))
-                in_zone = False
-
-    # Merge close zones
-    merged_zones = []
-    if zones_of_interest:
-        current_start, current_end, current_diff, _ = zones_of_interest[0]
-
-        for start_depth, end_depth, diff, thickness in zones_of_interest[1:]:
-            if start_depth - current_end <= merge_threshold:
-                current_end = end_depth
-                current_diff = max(current_diff, diff)  # Max difference in the zone
-            else:
-                merged_zones.append((current_start, current_end, current_diff))
-                current_start, current_end, current_diff = start_depth, end_depth, diff
-
-        merged_zones.append((current_start, current_end, current_diff))
-
-    # Visualization
+def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=10, thickness_threshold=3):
     fig = go.Figure()
 
-    # Plot smoothed data
-    fig.add_trace(go.Scatter(x=well_data['tvd_scs'], y=well_data_smoothed, mode='lines', name='Smoothed Data', line=dict(color='blue')))
+    for well_name in selected_wells:
+        # Load the data
+        well_data = df[df['wellname'] == well_name].copy()
 
-    # Plot LSTM predictions
-    fig.add_trace(go.Scatter(x=well_data['tvd_scs'][look_back:], y=lstm_predictions.flatten(), mode='lines', name='LSTM Predictions', line=dict(color='orange')))
+        # Load the trained LSTM model and scaler
+        model = LSTMModel(input_size=1, hidden_layer_size=50, output_size=1)
+        model.load_state_dict(torch.load('lstm_model.pth'))
+        scaler = torch.load('scaler.pth')
 
-    # Plot combined cutoff
-    fig.add_trace(go.Scatter(x=well_data['tvd_scs'][look_back:], y=combined_predictions, mode='lines', name='Combined Cutoff', line=dict(color='red', dash='dash')))
+        # Remove outliers and smooth the data
+        well_data_cleaned = remove_outliers(well_data['gr_n'].values)
+        well_data_smoothed = smooth_data_savgol(well_data_cleaned)
 
-    # Highlight zones of interest with varying colors based on the difference
-    for start, end, diff in merged_zones:
-        color_intensity = 0.7
-        color = 'yellow'
-        fig.add_vrect(x0=start, x1=end, fillcolor=color, opacity=color_intensity, line_width=0)
+        # Preprocess data for prediction
+        X = preprocess_data_for_prediction(well_data_smoothed, scaler, look_back)
 
-    # Final layout
-    fig.update_layout(title=f'Gamma Ray Log Predictions for {well_name}',
-                      xaxis_title='Depth',
-                      yaxis_title='Gamma Ray (gr_n)',
-                      template='plotly_white')
+        # Make LSTM predictions
+        lstm_predictions = predict_lstm(model, X, scaler)
 
+        # Calculate mean-based cutoff
+        mean_cutoff = np.mean(well_data_smoothed) * mean_multiplier
+
+        # Combine LSTM predictions and mean cutoff
+        combined_predictions = np.minimum(lstm_predictions.flatten(), mean_cutoff)
+
+        # Identify zones of interest
+        zones_of_interest = []
+        in_zone = False
+        for i in range(len(combined_predictions)):
+            if well_data_smoothed[i + look_back] < combined_predictions[i]:
+                if not in_zone:
+                    start_depth = well_data['tvd_scs'].iloc[i + look_back]
+                    in_zone = True
+            else:
+                if in_zone:
+                    end_depth = well_data['tvd_scs'].iloc[i + look_back - 1]
+                    thickness = end_depth - start_depth
+                    difference = np.abs(combined_predictions[i - 1] - well_data_smoothed[i + look_back - 1])
+                    if thickness >= thickness_threshold:  # Only consider zones with sufficient thickness
+                        zones_of_interest.append((start_depth, end_depth, difference, thickness))
+                    in_zone = False
+
+        # Merge close zones
+        merged_zones = []
+        if zones_of_interest:
+            current_start, current_end, current_diff, _ = zones_of_interest[0]
+
+            for start_depth, end_depth, diff, thickness in zones_of_interest[1:]:
+                if start_depth - current_end <= merge_threshold:
+                    current_end = end_depth
+                    current_diff = max(current_diff, diff)  # Max difference in the zone
+                else:
+                    merged_zones.append((current_start, current_end, current_diff))
+                    current_start, current_end, current_diff = start_depth, end_depth, diff
+
+            merged_zones.append((current_start, current_end, current_diff))
+
+        # Add subplot for this well
+        well_plot = go.Figure()
+
+        # Plot smoothed data
+        well_plot.add_trace(go.Scatter(x=well_data['tvd_scs'], y=well_data_smoothed, mode='lines', name='Smoothed Data', line=dict(color='blue')))
+
+        # Plot LSTM predictions
+        well_plot.add_trace(go.Scatter(x=well_data['tvd_scs'][look_back:], y=lstm_predictions.flatten(), mode='lines', name='LSTM Predictions', line=dict(color='orange')))
+
+        # Plot combined cutoff
+        well_plot.add_trace(go.Scatter(x=well_data['tvd_scs'][look_back:], y=combined_predictions, mode='lines', name='Combined Cutoff', line=dict(color='red', dash='dash')))
+
+        # Highlight zones of interest with varying colors based on the difference
+        for start, end, diff in merged_zones:
+            color_intensity = min(max(diff / max([d[2] for d in merged_zones]), 0.1), 1)  # Scale between 0.1 and 1 for better visibility
+            color = 'yellow'
+            well_plot.add_vrect(x0=start, x1=end, fillcolor=color, opacity=color_intensity, line_width=0)
+
+        # Add this well's plot to the main figure
+        fig.add_trace(well_plot.data[0])  # Smoothed data
+        fig.add_trace(well_plot.data[1])  # LSTM predictions
+        fig.add_trace(well_plot.data[2])  # Combined cutoff
+        for rect in well_plot.layout.shapes:  # Add rectangles for zones of interest
+            fig.add_shape(rect)
+
+        # Adjust layout for each subplot
+        fig.update_layout(
+            title=f'Gamma Ray Log Predictions for {well_name}',
+            xaxis_title='Depth',
+            yaxis_title='Gamma Ray (gr_n)',
+            template='plotly_white'
+        )
+
+    # Show the complete figure with all selected wells
     st.plotly_chart(fig)
 
 # Streamlit app interface
 def streamlit_app():
     st.title("LSTM Prediction for Gamma Ray Logs")
-    mean_multiplier = 1
-    look_back  =  50
+
     # File upload
     uploaded_file = st.file_uploader("Upload your CSV file", type="csv")
     if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
 
-        # Select well name
+        # Select well names (multiple)
         wells = df['wellname'].unique()
-        well_name = st.selectbox("Select well", wells)
+        selected_wells = st.multiselect("Select wells", wells)
 
         # Set parameters with sliders
-        # look_back = st.slider("Look Back Period", min_value=1, max_value=100, value=50, step=1)
-        # mean_multiplier = st.slider("Mean Multiplier", min_value=0.1, max_value=2.0, value=0.5, step=0.1)
+        look_back = st.slider("Look Back Period", min_value=1, max_value=100, value=50, step=1)
+        mean_multiplier = st.slider("Mean Multiplier", min_value=0.1, max_value=2.0, value=0.5, step=0.1)
         merge_threshold = st.slider("Merge Threshold", min_value=1, max_value=50, value=10, step=1)
         thickness_threshold = st.slider("Thickness Threshold", min_value=1, max_value=10, value=3, step=1)
 
         # Run prediction and visualization
         if st.button("Run LSTM Prediction"):
-            main(df, well_name, look_back, mean_multiplier, merge_threshold, thickness_threshold)
+            main(df, selected_wells, look_back, mean_multiplier, merge_threshold, thickness_threshold)
 
 # Run the app
 if __name__ == "__main__":
