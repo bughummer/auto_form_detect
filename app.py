@@ -67,6 +67,9 @@ def main(df, selected_wells, look_back=50, mean_multiplier=1, merge_threshold=10
 
     num_wells = len(selected_wells)
 
+    # Initialize a DataFrame to store the results
+    results_df = pd.DataFrame(columns=["well_number", "formation_number", "start_tvd_scs", "end_tvd_scs", "start_md", "end_md"])
+
     # Determine column widths based on the number of wells
     if num_wells == 1:
         fig = make_subplots(rows=1, cols=2, shared_yaxes=True, column_widths=[0.25, 0.75])
@@ -108,15 +111,15 @@ def main(df, selected_wells, look_back=50, mean_multiplier=1, merge_threshold=10
             if well_data_smoothed[i + look_back] < combined_predictions[i]:
                 if not in_zone:
                     start_depth = well_data['tvd_scs'].iloc[i + look_back]
-                    start_md = well_data['md'].iloc[i + look_back]  # Get the start MD value
+                    start_md = well_data['md'].iloc[i + look_back]
                     in_zone = True
             else:
                 if in_zone:
                     end_depth = well_data['tvd_scs'].iloc[i + look_back - 1]
-                    end_md = well_data['md'].iloc[i + look_back - 1]  # Get the end MD value
+                    end_md = well_data['md'].iloc[i + look_back - 1]
                     thickness = end_depth - start_depth
                     difference = np.abs(combined_predictions[i - 1] - well_data_smoothed[i + look_back - 1])
-                    if thickness >= thickness_threshold:  # Only consider zones with sufficient thickness
+                    if thickness >= thickness_threshold:
                         zones_of_interest.append((start_md, end_md, start_depth, end_depth, difference, thickness))
                     in_zone = False
 
@@ -129,12 +132,23 @@ def main(df, selected_wells, look_back=50, mean_multiplier=1, merge_threshold=10
                 if start_depth - current_end_depth <= merge_threshold:
                     current_end_depth = end_depth
                     current_end_md = end_md
-                    current_diff = max(current_diff, diff)  # Max difference in the zone
+                    current_diff = max(current_diff, diff)
                 else:
                     merged_zones.append((current_start_md, current_end_md, current_start_depth, current_end_depth, current_diff))
                     current_start_md, current_end_md, current_start_depth, current_end_depth, current_diff = start_md, end_md, start_depth, end_depth, diff
 
             merged_zones.append((current_start_md, current_end_md, current_start_depth, current_end_depth, current_diff))
+
+        # Store the results in the DataFrame
+        for formation_num, (start_md, end_md, start_depth, end_depth, _) in enumerate(merged_zones, 1):
+            results_df = results_df.append({
+                "well_number": well_name,
+                "formation_number": formation_num,
+                "start_tvd_scs": start_depth,
+                "end_tvd_scs": end_depth,
+                "start_md": start_md,
+                "end_md": end_md
+            }, ignore_index=True)
 
         # Plot smoothed data
         fig.add_trace(go.Scatter(
@@ -167,7 +181,7 @@ def main(df, selected_wells, look_back=50, mean_multiplier=1, merge_threshold=10
     # Final layout
     fig.update_layout(
         title=f'Formation tops detection based on GR log',
-        height=1600,  # Make the plot longer
+        height=1600,
         xaxis_title='Gamma Ray (gr_n)',
         yaxis_title='Depth',
         template='plotly_white',
@@ -177,15 +191,9 @@ def main(df, selected_wells, look_back=50, mean_multiplier=1, merge_threshold=10
 
     st.plotly_chart(fig)
 
-    # Print out the information of the merged zones
-    for idx, (start_md, end_md, start_depth, end_depth, diff) in enumerate(merged_zones):
-        thickness = end_depth - start_depth
-        st.text(f"Formation {idx + 1}:")
-        st.text(f"  MD Range: {start_md:.2f} - {end_md:.2f}")
-        st.text(f"  TVD SCS Range: {start_depth:.2f} - {end_depth:.2f}")
-        st.text(f"  Thickness: {thickness:.2f} meters")
-        st.text(f"  Max GR Difference: {diff:.2f}")
-        st.text("-" * 40)
+    # Display the DataFrame with the formation details
+    st.subheader("Detected Formations")
+    st.dataframe(results_df)
 
 # Streamlit app interface
 def streamlit_app():
@@ -200,9 +208,10 @@ def streamlit_app():
         # Select well names (multiple)
         wells = df['wellname'].unique()
         selected_wells = st.multiselect("Select wells", wells)
+
         # Set parameters with sliders
         look_back = 50
-        mean_multiplier = 1 
+        mean_multiplier = 1
         merge_threshold = st.number_input("Merge zones that have distance between them less than:", min_value=0, max_value=50, value=1, step=1)
         thickness_threshold = st.number_input("Ignore formations that have thickness less than:", min_value=0, max_value=50, value=1, step=1)
 
