@@ -137,20 +137,19 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
         fig.add_trace(go.Scatter(x=combined_predictions, y=well_data['tvd_scs'][look_back:], mode='lines', name=f'{well_name} - Combined Cutoff', line=dict(color='red', dash='dash')),
                       row=1, col=index+1)
 
-        # Highlight zones of interest using add_shape
+        # Highlight zones of interest using add_shape without xref and yref
         for start, end, diff in merged_zones:
             color_intensity = min(max(diff / max([d[2] for d in merged_zones]), 0.1), 1)  # Scale between 0.1 and 1 for better visibility
             color = 'yellow'
             fig.add_shape(type="rect",
                           x0=0, x1=1,  # Use the full width of the subplot
                           y0=start, y1=end,
-                          fillcolor=color, opacity=color_intensity, line_width=0,
-                          xref=f'x{index+1} domain', yref='y')
+                          fillcolor=color, opacity=color_intensity, line_width=0)
 
     # Final layout
     fig.update_layout(
         title=f'Gamma Ray Log Predictions for Selected Wells',
-        height=1400,  # Make the plot longer
+        height=800,  # Make the plot longer
         xaxis_title='Gamma Ray (gr_n)',
         yaxis_title='Depth',
         template='plotly_white',
