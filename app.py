@@ -64,7 +64,7 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
     if not selected_wells:
         st.warning("Please select at least one well.")
         return
-
+    results_list = []
     num_wells = len(selected_wells)
 
     # Determine column widths based on the number of wells
