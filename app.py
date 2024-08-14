@@ -162,7 +162,8 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
 
 # Streamlit app interface
 def streamlit_app():
-    st.title("LSTM Prediction for Gamma Ray Logs")
+    st.set_page_config(layout="wide")  # Set the page to wide mode
+    st.title("Detect Formation Tops based on Gamma Ray Logs")
 
     # File upload
     uploaded_file = st.file_uploader("Upload your CSV file", type="csv")
