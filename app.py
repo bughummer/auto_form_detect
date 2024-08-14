@@ -6,7 +6,7 @@ import numpy as np
 from scipy.signal import savgol_filter
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
- 
+
 # Define the LSTM model class
 class LSTMModel(nn.Module):
     def __init__(self, input_size=1, hidden_layer_size=50, output_size=1):
@@ -66,14 +66,18 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
         return
 
     num_wells = len(selected_wells)
-    if num_wells < 4:
-     column_widths = [0.25] * num_wells
+
+    # Determine column widths based on the number of wells
+    if num_wells == 1:
+        # For a single well, add an invisible subplot to control the width
+        fig = make_subplots(rows=1, cols=2, shared_yaxes=True, column_widths=[0.25, 0.75])
+    elif num_wells < 4:
+        # For 2 or 3 wells, assign a fixed width to each subplot
+        fig = make_subplots(rows=1, cols=num_wells, shared_yaxes=True, column_widths=[0.25] * num_wells)
     else:
-     column_widths = [1.0 / num_wells] * num_wells
-    st.write(num_wells)
-    st.write(column_widths)
-    # Create subplots with one column per well, and shared y-axis for depth
-    fig = make_subplots(rows=1, cols=num_wells, shared_yaxes=True, subplot_titles=selected_wells, column_widths=column_widths)
+        # For 4 or more wells, distribute the widths evenly
+        column_widths = [1.0 / num_wells] * num_wells
+        fig = make_subplots(rows=1, cols=num_wells, shared_yaxes=True, column_widths=column_widths)
 
     for index, well_name in enumerate(selected_wells):
         # Load the data
