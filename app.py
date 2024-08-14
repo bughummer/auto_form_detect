@@ -139,7 +139,7 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
 
         # Highlight zones of interest on each subplot correctly
         for start, end, diff in merged_zones:
-            color_intensity = 1
+            color_intensity = 0.5
             color = 'yellow'
             fig.add_shape(type="rect",
                           x0=well_data_smoothed.min(), x1=well_data_smoothed.max(),  # Use the range of the GR log
@@ -175,13 +175,13 @@ def streamlit_app():
         selected_wells = st.multiselect("Select wells", wells)
 
         # Set parameters with sliders
-        look_back = st.slider("Look Back Period", min_value=1, max_value=100, value=50, step=1)
-        mean_multiplier = st.slider("Mean Multiplier", min_value=0.1, max_value=2.0, value=0.5, step=0.1)
+        look_back = 50
+        mean_multiplier = 1 #st.slider("Mean Multiplier", min_value=0.1, max_value=2.0, value=0.5, step=0.1)
         merge_threshold = st.slider("Merge Threshold", min_value=1, max_value=50, value=10, step=1)
         thickness_threshold = st.slider("Thickness Threshold", min_value=1, max_value=10, value=3, step=1)
 
         # Run prediction and visualization
-        if st.button("Run LSTM Prediction"):
+        if st.button("Detect"):
             main(df, selected_wells, look_back, mean_multiplier, merge_threshold, thickness_threshold)
 
 # Run the app
