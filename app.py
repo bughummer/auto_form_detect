@@ -137,7 +137,10 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
         for start, end, diff in merged_zones:
             color_intensity = min(max(diff / max([d[2] for d in merged_zones]), 0.1), 1)  # Scale between 0.1 and 1 for better visibility
             color = 'yellow'
-            fig.add_vrect(y0=start, y1=end, fillcolor=color, opacity=color_intensity, line_width=0, row=1, col=index+1)
+            fig.add_vrect(y0=start, y1=end, fillcolor=color, opacity=color_intensity, line_width=0,
+                          xref=f'x{index+1}', yref=f'y',  # Reference the specific subplot's x-axis
+                          annotation_text=f'Zone {index+1}', annotation_position="top left")
+
 
     # Final layout
     fig.update_layout(
