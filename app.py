@@ -145,7 +145,7 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
             color_intensity = 0.5
             color = 'yellow'
             fig.add_shape(type="rect",
-                          x0=0, 150,  # Use the range of the GR log
+                          x0=0, x1=150,   # Use the range of the GR log
                           y0=start, y1=end,
                           fillcolor=color, opacity=color_intensity, line_width=0,
                           row=1, col=index+1)
