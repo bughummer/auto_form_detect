@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 from scipy.signal import savgol_filter
 import plotly.graph_objs as go
+from plotly.subplots import make_subplots
 
 # Define the LSTM model class
 class LSTMModel(nn.Module):
@@ -60,7 +61,8 @@ def predict_lstm(model, X, scaler):
 
 # Main function to load model, make predictions, identify zones of interest, and visualize the results
 def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=10, thickness_threshold=3):
-    fig = go.Figure()
+    # Create subplots with one column per well
+    fig = make_subplots(rows=1, cols=len(selected_wells), shared_yaxes=True, subplot_titles=selected_wells)
 
     for index, well_name in enumerate(selected_wells):
         # Load the data
@@ -119,31 +121,32 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
 
             merged_zones.append((current_start, current_end, current_diff))
 
-        # Calculate x-offset for each well
-        x_offset = index * 100  # Adjust this value based on your data's depth range for better spacing
-
         # Plot smoothed data
-        fig.add_trace(go.Scatter(x=well_data['tvd_scs'] + x_offset, y=well_data_smoothed, mode='lines', name=f'{well_name} - Smoothed Data', line=dict(color='blue')))
+        fig.add_trace(go.Scatter(x=well_data_smoothed, y=well_data['tvd_scs'], mode='lines', name=f'{well_name} - Smoothed Data', line=dict(color='blue')),
+                      row=1, col=index+1)
 
         # Plot LSTM predictions
-        fig.add_trace(go.Scatter(x=well_data['tvd_scs'][look_back:] + x_offset, y=lstm_predictions.flatten(), mode='lines', name=f'{well_name} - LSTM Predictions', line=dict(color='orange')))
+        fig.add_trace(go.Scatter(x=lstm_predictions.flatten(), y=well_data['tvd_scs'][look_back:], mode='lines', name=f'{well_name} - LSTM Predictions', line=dict(color='orange')),
+                      row=1, col=index+1)
 
         # Plot combined cutoff
-        fig.add_trace(go.Scatter(x=well_data['tvd_scs'][look_back:] + x_offset, y=combined_predictions, mode='lines', name=f'{well_name} - Combined Cutoff', line=dict(color='red', dash='dash')))
+        fig.add_trace(go.Scatter(x=combined_predictions, y=well_data['tvd_scs'][look_back:], mode='lines', name=f'{well_name} - Combined Cutoff', line=dict(color='red', dash='dash')),
+                      row=1, col=index+1)
 
         # Highlight zones of interest with varying colors based on the difference
         for start, end, diff in merged_zones:
             color_intensity = min(max(diff / max([d[2] for d in merged_zones]), 0.1), 1)  # Scale between 0.1 and 1 for better visibility
             color = 'yellow'
-            fig.add_vrect(x0=start + x_offset, x1=end + x_offset, fillcolor=color, opacity=color_intensity, line_width=0)
+            fig.add_vrect(y0=start, y1=end, fillcolor=color, opacity=color_intensity, line_width=0, row=1, col=index+1)
 
     # Final layout
     fig.update_layout(
         title=f'Gamma Ray Log Predictions for Selected Wells',
-        xaxis_title='Depth (with offset for each well)',
-        yaxis_title='Gamma Ray (gr_n)',
+        xaxis_title='Gamma Ray (gr_n)',
+        yaxis_title='Depth',
         template='plotly_white',
-        showlegend=True
+        showlegend=True,
+        yaxis_autorange='reversed'  # Depth increases downwards
     )
 
     st.plotly_chart(fig)
