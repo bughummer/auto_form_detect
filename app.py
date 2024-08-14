@@ -174,18 +174,7 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
             name='Combined Cutoff', line=dict(color='red', dash='dash'), showlegend=(index == 0)
         ), row=1, col=index+1)
 
-        # Highlight zones of interest on each subplot correctly
-        for start_md, end_md, start_depth, end_depth, diff in merged_zones:
-            color_intensity = 0.5
-            color = 'yellow'
-            hover_text = f"Start TVD: {start_depth:.2f}<br>End TVD: {end_depth:.2f}<br>Thickness: {end_depth - start_depth:.2f} meters"
-            
-            # Add the rectangular highlight for the zone
-            fig.add_shape(type="rect",
-                          x0=0, x1=150,   # Use the range of the GR log
-                          y0=start_depth, y1=end_depth,
-                          fillcolor=color, opacity=color_intensity, line_width=0,
-                          row=1, col=index+1)
+
             
             # Add a dummy scatter trace for hover text
             fig.add_trace(go.Scatter(
