@@ -156,8 +156,8 @@ def streamlit_app():
         well_name = st.selectbox("Select well", wells)
 
         # Set parameters with sliders
-        look_back = st.slider("Look Back Period", min_value=1, max_value=100, value=50, step=1)
-        mean_multiplier = st.slider("Mean Multiplier", min_value=0.1, max_value=2.0, value=0.5, step=0.1)
+        # look_back = st.slider("Look Back Period", min_value=1, max_value=100, value=50, step=1)
+        # mean_multiplier = st.slider("Mean Multiplier", min_value=0.1, max_value=2.0, value=0.5, step=0.1)
         merge_threshold = st.slider("Merge Threshold", min_value=1, max_value=50, value=10, step=1)
         thickness_threshold = st.slider("Thickness Threshold", min_value=1, max_value=10, value=3, step=1)
 
