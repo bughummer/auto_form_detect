@@ -59,27 +59,15 @@ def predict_lstm(model, X, scaler):
     predictions_inverse = scaler.inverse_transform(predictions)
     return predictions_inverse
 
-# Main function to load model, make predictions, identify zones of interest, and visualize the results
+# Main function to load model, make predictions, identify zones of interest, and create a DataFrame
 def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=10, thickness_threshold=3):
     if not selected_wells:
         st.warning("Please select at least one well.")
         return
-    results_list = []
-    num_wells = len(selected_wells)
 
-    # Determine column widths based on the number of wells
-    if num_wells == 1:
-        # For a single well, add an invisible subplot to control the width
-        fig = make_subplots(rows=1, cols=2, shared_yaxes=True, column_widths=[0.25, 0.75])
-    elif num_wells < 4:
-        # For 2 or 3 wells, assign a fixed width to each subplot
-        fig = make_subplots(rows=1, cols=num_wells, shared_yaxes=True, column_widths=[0.25] * num_wells)
-    else:
-        # For 4 or more wells, distribute the widths evenly
-        column_widths = [1.0 / num_wells] * num_wells
-        fig = make_subplots(rows=1, cols=num_wells, shared_yaxes=True, column_widths=column_widths)
+    zones_df_list = []
 
-    for index, well_name in enumerate(selected_wells):
+    for well_name in selected_wells:
         # Load the data
         well_data = df[df['wellname'] == well_name].copy()
 
@@ -111,46 +99,6 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
             if well_data_smoothed[i + look_back] < combined_predictions[i]:
                 if not in_zone:
                     start_depth = well_data['tvd_scs'].iloc[i + look_back]
-                    in_zone = True
-            else:
-                if in_zone:
-                    end_depth = well_data['tvd_scs'].iloc[i + look_back - 1]
-                    thickness = end_depth - start_depth
-                    difference = np.abs(combined_predictions[i - 1] - well_data_smoothed[i + look_back - 1])
-                    if thickness >= thickness_threshold:  # Only consider zones with sufficient thickness
-                        zones_of_interest.append((start_depth, end_depth, difference, thickness))
-                    in_zone = False
-
-        # Merge close zones
-        merged_zones = []
-        if zones_of_interest:
-            current_start, current_end, current_diff, _ = zones_of_interest[0]
-
-            for start_depth, end_depth, diff, thickness in zones_of_interest[1:]:
-                if start_depth - current_end <= merge_threshold:
-                    current_end = end_depth
-                    current_diff = max(current_diff, diff)  # Max difference in the zone
-                else:
-                    merged_zones.append((current_start, current_end, current_diff))
-                    current_start, current_end, current_diff = start_depth, end_depth, diff
-
-            merged_zones.append((current_start, current_end, current_diff))
-         # Highlight zones of interest on each subplot correctly
-        for start, end, diff in merged_zones:
-            color_intensity = 0.5
-            color = 'yellow'
-            fig.add_shape(type="rect",
-                          x0=0, x1=150,   # Use the range of the GR log
-                          y0=start, y1=end,
-                          fillcolor=color, opacity=color_intensity, line_width=0,
-                          row=1, col=index+1)           
-        # Identify zones of interest
-        zones_of_interest = []
-        in_zone = False
-        for i in range(len(combined_predictions)):
-            if well_data_smoothed[i + look_back] < combined_predictions[i]:
-                if not in_zone:
-                    start_depth = well_data['tvd_scs'].iloc[i + look_back]
                     start_md = well_data['md'].iloc[i + look_back]
                     in_zone = True
             else:
@@ -159,69 +107,35 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
                     end_md = well_data['md'].iloc[i + look_back - 1]
                     thickness = end_depth - start_depth
                     difference = np.abs(combined_predictions[i - 1] - well_data_smoothed[i + look_back - 1])
-                    if thickness >= thickness_threshold:
-                        zones_of_interest.append((start_md, end_md, start_depth, end_depth, difference, thickness))
+                    if thickness >= thickness_threshold:  # Only consider zones with sufficient thickness
+                        zones_of_interest.append((well_name, start_depth, end_depth, start_md, end_md, difference, thickness))
                     in_zone = False
 
         # Merge close zones
         merged_zones = []
         if zones_of_interest:
-            current_start_md, current_end_md, current_start_depth, current_end_depth, current_diff, _ = zones_of_interest[0]
+            current_start_depth, current_end_depth, current_start_md, current_end_md, current_diff, _ = zones_of_interest[0]
 
-            for start_md, end_md, start_depth, end_depth, diff, thickness in zones_of_interest[1:]:
+            for well_name, start_depth, end_depth, start_md, end_md, diff, thickness in zones_of_interest[1:]:
                 if start_depth - current_end_depth <= merge_threshold:
                     current_end_depth = end_depth
                     current_end_md = end_md
-                    current_diff = max(current_diff, diff)
+                    current_diff = max(current_diff, diff)  # Max difference in the zone
                 else:
-                    merged_zones.append((current_start_md, current_end_md, current_start_depth, current_end_depth, current_diff))
-                    current_start_md, current_end_md, current_start_depth, current_end_depth, current_diff = start_md, end_md, start_depth, end_depth, diff
+                    merged_zones.append((well_name, current_start_depth, current_end_depth, current_start_md, current_end_md, current_diff))
+                    current_start_depth, current_end_depth, current_start_md, current_end_md, current_diff = start_depth, end_depth, start_md, end_md, diff
 
-            merged_zones.append((current_start_md, current_end_md, current_start_depth, current_end_depth, current_diff))
+            merged_zones.append((well_name, current_start_depth, current_end_depth, current_start_md, current_end_md, current_diff))
 
-        # Add the results to the DataFrame
-        for formation_num, (start_md, end_md, start_depth, end_depth, _) in enumerate(merged_zones, 1):
-            results_list.append({
-                "well_number": well_name,
-                "formation_number": formation_num,
-                "start_tvd_scs": start_depth,
-                "end_tvd_scs": end_depth,
-                "start_md": start_md,
-                "end_md": end_md
-            })
-            
-        # Plot smoothed data
-        fig.add_trace(go.Scatter(
-            x=well_data_smoothed, y=well_data['tvd_scs'], mode='lines',
-            name='Smoothed Data', line=dict(color='blue'), showlegend=(index == 0)
-        ), row=1, col=index+1)
+        zones_df = pd.DataFrame(merged_zones, columns=['Well', 'Start Depth (tvd_scs)', 'End Depth (tvd_scs)', 'Start Depth (md)', 'End Depth (md)', 'Max Difference'])
+        zones_df_list.append(zones_df)
 
-        # Plot LSTM predictions
-        fig.add_trace(go.Scatter(
-            x=lstm_predictions.flatten(), y=well_data['tvd_scs'][look_back:], mode='lines',
-            name='LSTM Predictions', line=dict(color='orange'), showlegend=(index == 0)
-        ), row=1, col=index+1)
-
-        # Plot combined cutoff
-        fig.add_trace(go.Scatter(
-            x=combined_predictions, y=well_data['tvd_scs'][look_back:], mode='lines',
-            name='Combined Cutoff', line=dict(color='red', dash='dash'), showlegend=(index == 0)
-        ), row=1, col=index+1)
-
-
-
-    # Final layout
-    fig.update_layout(
-        title=f'Formation tops detection based on GR log',
-        height=1600,  # Make the plot longer
-        xaxis_title='Gamma Ray (gr_n)',
-        yaxis_title='Depth',
-        template='plotly_white',
-        showlegend=True,
-        yaxis_autorange='reversed'  # Depth increases downwards
-    )
-
-    st.plotly_chart(fig)
+    # Concatenate all zones into a single DataFrame
+    if zones_df_list:
+        final_zones_df = pd.concat(zones_df_list, ignore_index=True)
+        st.dataframe(final_zones_df)
+    else:
+        st.warning("No zones of interest detected.")
 
 # Streamlit app interface
 def streamlit_app():
