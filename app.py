@@ -67,6 +67,7 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
 
     num_wells = len(selected_wells)
     column_widths = [1.0 / num_wells] * num_wells
+    st.write(column_widths)
 
     # Create subplots with one column per well, and shared y-axis for depth
     fig = make_subplots(rows=1, cols=num_wells, shared_yaxes=True, subplot_titles=selected_wells, column_widths=column_widths)
@@ -176,7 +177,6 @@ def streamlit_app():
         # Select well names (multiple)
         wells = df['wellname'].unique()
         selected_wells = st.multiselect("Select wells", wells)
-
         # Set parameters with sliders
         look_back = 50
         mean_multiplier = 1 #st.slider("Mean Multiplier", min_value=0.1, max_value=2.0, value=0.5, step=0.1)
