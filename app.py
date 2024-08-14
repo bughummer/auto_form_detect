@@ -137,16 +137,22 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
             merged_zones.append((current_start, current_end, current_diff))
 
         # Plot smoothed data
-        fig.add_trace(go.Scatter(x=well_data_smoothed, y=well_data['tvd_scs'], mode='lines', name=f'{well_name} - Smoothed Data', line=dict(color='blue')),
-                      row=1, col=index+1)
+        fig.add_trace(go.Scatter(
+            x=well_data_smoothed, y=well_data['tvd_scs'], mode='lines',
+            name='Smoothed Data', line=dict(color='blue'), showlegend=(index == 0)
+        ), row=1, col=index+1)
 
         # Plot LSTM predictions
-        fig.add_trace(go.Scatter(x=lstm_predictions.flatten(), y=well_data['tvd_scs'][look_back:], mode='lines', name=f'{well_name} - LSTM Predictions', line=dict(color='orange')),
-                      row=1, col=index+1)
+        fig.add_trace(go.Scatter(
+            x=lstm_predictions.flatten(), y=well_data['tvd_scs'][look_back:], mode='lines',
+            name='LSTM Predictions', line=dict(color='orange'), showlegend=(index == 0)
+        ), row=1, col=index+1)
 
         # Plot combined cutoff
-        fig.add_trace(go.Scatter(x=combined_predictions, y=well_data['tvd_scs'][look_back:], mode='lines', name=f'{well_name} - Combined Cutoff', line=dict(color='red', dash='dash')),
-                      row=1, col=index+1)
+        fig.add_trace(go.Scatter(
+            x=combined_predictions, y=well_data['tvd_scs'][look_back:], mode='lines',
+            name='Combined Cutoff', line=dict(color='red', dash='dash'), showlegend=(index == 0)
+        ), row=1, col=index+1)
 
         # Highlight zones of interest on each subplot correctly
         for start, end, diff in merged_zones:
