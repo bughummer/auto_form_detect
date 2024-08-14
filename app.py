@@ -67,19 +67,13 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
 
     num_wells = len(selected_wells)
 
-    # Initialize a list to collect the results
-    results_list = []
-
     # Determine column widths based on the number of wells
     if num_wells == 1:
-        # For a single well, make the plot occupy the entire space
-        fig = make_subplots(rows=1, cols=1, shared_yaxes=True, column_widths=[1.0])
-    elif num_wells == 2:
-        # For two wells, split the space evenly
-        fig = make_subplots(rows=1, cols=2, shared_yaxes=True, column_widths=[0.5, 0.5])
+        # For a single well, add an invisible subplot to control the width
+        fig = make_subplots(rows=1, cols=2, shared_yaxes=True, column_widths=[0.25, 0.75])
     elif num_wells < 4:
         # For 2 or 3 wells, assign a fixed width to each subplot
-        fig = make_subplots(rows=1, cols=num_wells, shared_yaxes=True, column_widths=[1.0 / num_wells] * num_wells)
+        fig = make_subplots(rows=1, cols=num_wells, shared_yaxes=True, column_widths=[0.25] * num_wells)
     else:
         # For 4 or more wells, distribute the widths evenly
         column_widths = [1.0 / num_wells] * num_wells
@@ -110,6 +104,38 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
         # Combine LSTM predictions and mean cutoff
         combined_predictions = np.minimum(lstm_predictions.flatten(), mean_cutoff)
 
+        # Identify zones of interest
+        zones_of_interest = []
+        in_zone = False
+        for i in range(len(combined_predictions)):
+            if well_data_smoothed[i + look_back] < combined_predictions[i]:
+                if not in_zone:
+                    start_depth = well_data['tvd_scs'].iloc[i + look_back]
+                    in_zone = True
+            else:
+                if in_zone:
+                    end_depth = well_data['tvd_scs'].iloc[i + look_back - 1]
+                    thickness = end_depth - start_depth
+                    difference = np.abs(combined_predictions[i - 1] - well_data_smoothed[i + look_back - 1])
+                    if thickness >= thickness_threshold:  # Only consider zones with sufficient thickness
+                        zones_of_interest.append((start_depth, end_depth, difference, thickness))
+                    in_zone = False
+
+        # Merge close zones
+        merged_zones = []
+        if zones_of_interest:
+            current_start, current_end, current_diff, _ = zones_of_interest[0]
+
+            for start_depth, end_depth, diff, thickness in zones_of_interest[1:]:
+                if start_depth - current_end <= merge_threshold:
+                    current_end = end_depth
+                    current_diff = max(current_diff, diff)  # Max difference in the zone
+                else:
+                    merged_zones.append((current_start, current_end, current_diff))
+                    current_start, current_end, current_diff = start_depth, end_depth, diff
+
+            merged_zones.append((current_start, current_end, current_diff))
+            
         # Identify zones of interest
         zones_of_interest = []
         in_zone = False
@@ -155,7 +181,7 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
                 "start_md": start_md,
                 "end_md": end_md
             })
-
+            
         # Plot smoothed data
         fig.add_trace(go.Scatter(
             x=well_data_smoothed, y=well_data['tvd_scs'], mode='lines',
@@ -174,33 +200,32 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
             name='Combined Cutoff', line=dict(color='red', dash='dash'), showlegend=(index == 0)
         ), row=1, col=index+1)
 
-
-
-
-
-    # Convert the results list to a DataFrame
-    results_df = pd.DataFrame(results_list)
+        # Highlight zones of interest on each subplot correctly
+        for start, end, diff in merged_zones:
+            color_intensity = 0.5
+            color = 'yellow'
+            fig.add_shape(type="rect",
+                          x0=0, x1=150,   # Use the range of the GR log
+                          y0=start, y1=end,
+                          fillcolor=color, opacity=color_intensity, line_width=0,
+                          row=1, col=index+1)
 
     # Final layout
     fig.update_layout(
         title=f'Formation tops detection based on GR log',
-        height=1600,
+        height=1600,  # Make the plot longer
         xaxis_title='Gamma Ray (gr_n)',
         yaxis_title='Depth',
         template='plotly_white',
         showlegend=True,
-        yaxis_autorange='reversed'
+        yaxis_autorange='reversed'  # Depth increases downwards
     )
 
     st.plotly_chart(fig)
 
-    # Display the results DataFrame
-    st.write("Detected Formations")
-    st.dataframe(results_df)
-
 # Streamlit app interface
 def streamlit_app():
-    st.set_page_config(layout="wide")
+    st.set_page_config(layout="wide")  # Set the page to wide mode
     st.title("Detect Formation Tops based on Gamma Ray Logs")
 
     # File upload
@@ -211,10 +236,9 @@ def streamlit_app():
         # Select well names (multiple)
         wells = df['wellname'].unique()
         selected_wells = st.multiselect("Select wells", wells)
-
         # Set parameters with sliders
         look_back = 50
-        mean_multiplier = 1
+        mean_multiplier = 1 #st.slider("Mean Multiplier", min_value=0.1, max_value=2.0, value=0.5, step=0.1)
         merge_threshold = st.number_input("Merge zones that have distance between them less than:", min_value=0, max_value=50, value=1, step=1)
         thickness_threshold = st.number_input("Ignore formations that have thickness less than:", min_value=0, max_value=50, value=1, step=1)
 
