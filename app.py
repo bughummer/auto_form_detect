@@ -1,122 +1,146 @@
-import streamlit as st 
+import streamlit as st
 import pandas as pd
+import numpy as np
 import torch
 import plotly.graph_objs as go
-import numpy as np
+from scipy.signal import savgol_filter
 
 # Define the LSTM model class
 class LSTMModel(torch.nn.Module):
-    def __init__(self, input_size=1, hidden_size=50, output_size=1):
+    def __init__(self, input_size=1, hidden_layer_size=50, output_size=1):
         super(LSTMModel, self).__init__()
-        self.lstm = torch.nn.LSTM(input_size, hidden_size, batch_first=True)
+        self.hidden_layer_size = hidden_layer_size
+        self.lstm = torch.nn.LSTM(input_size, hidden_layer_size, batch_first=True)
         self.linear = torch.nn.Linear(hidden_size, output_size)
 
-    def forward(self, x):
-        lstm_out, _ = self.lstm(x)
-        return self.linear(lstm_out[:, -1])
+    def forward(self, input_seq):
+        batch_size = input_seq.size(0)
+        self.hidden_cell = (torch.zeros(1, batch_size, self.hidden_layer_size),
+                            torch.zeros(1, batch_size, self.hidden_layer_size))
+        lstm_out, self.hidden_cell = self.lstm(input_seq, self.hidden_cell)
+        predictions = self.linear(lstm_out[:, -1])
+        return predictions
+
+# Function to remove outliers based on z-score
+def remove_outliers(data, z_thresh=3):
+    mean = np.mean(data)
+    std = np.std(data)
+    z_scores = np.abs((data - mean) / std)
+    return data[z_scores < z_thresh]
 
 # Function to smooth data using Savitzky-Golay filter
-def smooth_data(data):
-    from scipy.signal import savgol_filter
-    data['gr_n_smoothed'] = savgol_filter(data['gr_n'], 51, 2)
-    return data
+def smooth_data_savgol(data, window_length=51, polyorder=2):
+    smoothed_data = savgol_filter(data, window_length=window_length, polyorder=polyorder)
+    return smoothed_data
 
-# Preprocess the data for prediction
+# Function to preprocess data for prediction
 def preprocess_data_for_prediction(data, scaler, look_back):
-    data = smooth_data(data)
-    scaled_data = scaler.transform(data['gr_n_smoothed'].values.reshape(-1, 1))
-    X = [scaled_data[i:i+look_back] for i in range(len(scaled_data) - look_back)]
+    data_scaled = scaler.transform(data.reshape(-1, 1))
     
-    # Convert X to a NumPy array
-    X = np.array(X)
-        
-    if X.size == 0:
-        raise ValueError("Error: X is empty. Check if there is sufficient data after preprocessing.")
-    
-    # Check if X is 3-dimensional
-    if len(X.shape) != 3:
-        raise ValueError(f"Error: X should be 3-dimensional (samples, look_back, 1). Got shape={X.shape} instead.")
-        
-    return torch.from_numpy(X).float()
+    def create_dataset(dataset, look_back):
+        X = []
+        for i in range(len(dataset) - look_back - 1):
+            a = dataset[i:(i + look_back), 0]
+            X.append(a)
+        return np.array(X)
 
-# Predict using the LSTM model
+    X = create_dataset(data_scaled, look_back)
+    X = np.reshape(X, (X.shape[0], X.shape[1], 1))
+    
+    return torch.tensor(X, dtype=torch.float32)
+
+# Function to predict with LSTM and inverse scale the predictions
 def predict_lstm(model, X, scaler):
-    model.eval()  # Set model to evaluation mode
-    y_pred = model(X).detach().numpy()
-    return scaler.inverse_transform(y_pred)
+    model.eval()
+    with torch.no_grad():
+        predictions = model(X).numpy()
+    predictions_inverse = scaler.inverse_transform(predictions)
+    return predictions_inverse
 
-# Streamlit app code
-st.set_page_config(layout="wide")  # Set the page to wide mode
-
-st.title("LSTM Prediction for Gamma Ray Logs")
-
-# Step 1: File upload
-uploaded_file = st.file_uploader("Upload your CSV file", type="csv")
-if uploaded_file is not None:
-    well_data = pd.read_csv(uploaded_file)
+# Main function to load model, make predictions, and identify zones of interest
+def main(df, selected_wells, look_back, mean_multiplier, merge_threshold, thickness_threshold):
+    # Initialize empty lists to hold combined data from all selected wells
+    all_well_data_smoothed = []
+    all_lstm_predictions = []
+    all_combined_predictions = []
+    all_depths = []
+    all_well_names = []
     
-    # Step 2: Select well from dropdown
-    well_options = well_data['wellname'].unique()
-    selected_well = st.selectbox("Select a well", well_options)
-    
-    if selected_well:
-        st.write(f"You selected: {selected_well}")
-        well_data = well_data[well_data['wellname'] == selected_well]
-        
-        # Load the pre-trained LSTM model
-        model = LSTMModel()
+    # Loop over selected wells
+    for well_name in selected_wells:
+        # Load the data for the current well
+        well_data = df[df['wellname'] == well_name].copy()
+
+        # Load the trained LSTM model and scaler
+        lstm_units = 50
+        model = LSTMModel(input_size=1, hidden_layer_size=lstm_units, output_size=1)
         model.load_state_dict(torch.load('lstm_model.pth'))
-
-        # Load the pre-fitted scaler using torch.load
         scaler = torch.load('scaler.pth')
-        
-        # Preprocess the data
-        look_back = 10
-        X = preprocess_data_for_prediction(well_data, scaler, look_back)
-        
-        # Predict using the LSTM model
+
+        # Remove outliers and smooth the data
+        well_data_cleaned = remove_outliers(well_data['gr_n'].values)
+        well_data_smoothed = smooth_data_savgol(well_data_cleaned)
+
+        # Preprocess data for prediction
+        X = preprocess_data_for_prediction(well_data_smoothed, scaler, look_back)
+
+        # Make LSTM predictions
         lstm_predictions = predict_lstm(model, X, scaler)
         
-        # Use the correct depth column for plotting
-        depth = well_data['tvd_scs'].values
+        # Calculate mean-based cutoff
+        mean_cutoff = np.mean(well_data_smoothed) * mean_multiplier
 
-        fig = go.Figure()
+        # Combine LSTM predictions and mean cutoff
+        combined_predictions = np.minimum(lstm_predictions.flatten(), mean_cutoff)
 
-        # Plot original GR curve (vertical)
-        fig.add_trace(go.Scatter(y=depth, x=well_data['gr_n'], name='Original GR', line=dict(color='gray')))
+        # Store the data for plotting
+        all_well_data_smoothed.append(well_data_smoothed)
+        all_lstm_predictions.append(lstm_predictions.flatten())
+        all_combined_predictions.append(combined_predictions)
+        all_depths.append(well_data['tvd_scs'].values[look_back:])
+        all_well_names.append(well_name)
 
-        # Plot smoothed GR curve (vertical)
-        fig.add_trace(go.Scatter(y=depth, x=well_data['gr_n_smoothed'], name='Smoothed GR', line=dict(color='blue')))
+    # Visualization
+    fig = go.Figure()
 
-        # Plot LSTM Predictions (vertical)
-        fig.add_trace(go.Scatter(y=depth[look_back:], x=lstm_predictions.flatten(), name='LSTM Predictions', line=dict(color='orange')))
+    # Plot smoothed data and predictions for each well
+    for i, well_name in enumerate(all_well_names):
+        fig.add_trace(go.Scatter(x=all_depths[i], y=all_well_data_smoothed[i], mode='lines', name=f'{well_name} Smoothed Data', line=dict(color='blue')))
+        fig.add_trace(go.Scatter(x=all_depths[i], y=all_lstm_predictions[i], mode='lines', name=f'{well_name} LSTM Predictions', line=dict(color='orange')))
+        fig.add_trace(go.Scatter(x=all_depths[i], y=all_combined_predictions[i], mode='lines', name=f'{well_name} Combined Cutoff', line=dict(color='red', dash='dash')))
 
-        # Highlight zones of interest (vertical)
-        zones_below_combined = []
-        in_zone = False
-        for i in range(len(lstm_predictions)):
-            if well_data['gr_n_smoothed'].iloc[i + look_back] < lstm_predictions[i]:
-                if not in_zone:
-                    start_depth = depth[i + look_back]
-                    in_zone = True
-            else:
-                if in_zone:
-                    end_depth = depth[i + look_back - 1]
-                    zones_below_combined.append((start_depth, end_depth))
-                    in_zone = False
+    # Final layout
+    fig.update_layout(title=f'Gamma Ray Log Predictions for Selected Wells: {", ".join(all_well_names)}',
+                      xaxis_title='Depth',
+                      yaxis_title='Gamma Ray (gr_n)',
+                      template='plotly_white')
 
-        # Plot zones of interest (vertical)
-        for start, end in zones_below_combined:
-            fig.add_hrect(y0=start, y1=end, fillcolor="yellow", opacity=0.3, line_width=0)
+    st.plotly_chart(fig)
 
-        # Final layout adjustments for vertical plot
-        fig.update_layout(title=f'Gamma Ray Log Predictions for {selected_well}',
-                          yaxis_title='Depth',
-                          xaxis_title='GR Value',
-                          template='plotly_white',
-                          yaxis_autorange='reversed',  # Ensure depth increases downwards
-                          height=1500,  # Make the plot longer
-                          width=400)  # Make the plot narrower
+# Streamlit app
+st.title("LSTM Prediction for Gamma Ray Logs")
 
-        # Show plot in the Streamlit app
-        st.plotly_chart(fig)
+# File upload
+uploaded_file = st.file_uploader("Upload your CSV file", type="csv")
+if uploaded_file is not None:
+    df = pd.read_csv(uploaded_file)
+
+    # Select wells
+    wells = st.multiselect("Select wells", options=df['wellname'].unique())
+
+    # Set parameters with sliders
+    look_back = st.slider("Look Back Period", min_value=1, max_value=100, value=50, step=1)
+    mean_multiplier = st.slider("Mean Multiplier", min_value=0.1, max_value=2.0, value=0.5, step=0.1)
+    merge_threshold = st.slider("Merge Threshold", min_value=1, max_value=50, value=10, step=1)
+    thickness_threshold = st.slider("Thickness Threshold", min_value=1, max_value=10, value=3, step=1)
+
+    # Show selected parameters
+    st.write(f"Selected Wells: {', '.join(wells)}")
+    st.write(f"Look Back Period: {look_back}")
+    st.write(f"Mean Multiplier: {mean_multiplier}")
+    st.write(f"Merge Threshold: {merge_threshold}")
+    st.write(f"Thickness Threshold: {thickness_threshold}")
+
+    # Run main function
+    if st.button("Run LSTM Prediction"):
+        main(df, wells, look_back, mean_multiplier, merge_threshold, thickness_threshold)
