@@ -1,8 +1,8 @@
-import streamlit as st
 import torch
 import torch.nn as nn
 import pandas as pd
 import numpy as np
+from sklearn.preprocessing import MinMaxScaler
 from scipy.signal import savgol_filter
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
@@ -67,8 +67,8 @@ def main(df, selected_wells, look_back=50, mean_multiplier=1, merge_threshold=10
 
     num_wells = len(selected_wells)
 
-    # Initialize a DataFrame to store the results
-    results_df = pd.DataFrame(columns=["well_number", "formation_number", "start_tvd_scs", "end_tvd_scs", "start_md", "end_md"])
+    # Initialize a list to collect the results
+    results_list = []
 
     # Determine column widths based on the number of wells
     if num_wells == 1:
@@ -139,16 +139,16 @@ def main(df, selected_wells, look_back=50, mean_multiplier=1, merge_threshold=10
 
             merged_zones.append((current_start_md, current_end_md, current_start_depth, current_end_depth, current_diff))
 
-        # Store the results in the DataFrame
+        # Store the results in the list
         for formation_num, (start_md, end_md, start_depth, end_depth, _) in enumerate(merged_zones, 1):
-            results_df = results_df.append({
+            results_list.append({
                 "well_number": well_name,
                 "formation_number": formation_num,
                 "start_tvd_scs": start_depth,
                 "end_tvd_scs": end_depth,
                 "start_md": start_md,
                 "end_md": end_md
-            }, ignore_index=True)
+            })
 
         # Plot smoothed data
         fig.add_trace(go.Scatter(
@@ -178,6 +178,9 @@ def main(df, selected_wells, look_back=50, mean_multiplier=1, merge_threshold=10
                           fillcolor=color, opacity=color_intensity, line_width=0,
                           row=1, col=index+1)
 
+    # Convert the results list to a DataFrame
+    results_df = pd.DataFrame(results_list)
+
     # Final layout
     fig.update_layout(
         title=f'Formation tops detection based on GR log',
@@ -191,13 +194,13 @@ def main(df, selected_wells, look_back=50, mean_multiplier=1, merge_threshold=10
 
     st.plotly_chart(fig)
 
-    # Display the DataFrame with the formation details
-    st.subheader("Detected Formations")
+    # Display the DataFrame with the formation information
+    st.write("Detected Formations")
     st.dataframe(results_df)
 
 # Streamlit app interface
 def streamlit_app():
-    st.set_page_config(layout="wide")  # Set the page to wide mode
+    st.set_page_config(layout="wide")
     st.title("Detect Formation Tops based on Gamma Ray Logs")
 
     # File upload
