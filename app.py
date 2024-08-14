@@ -139,7 +139,7 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
 
         # Highlight zones of interest on each subplot correctly
         for start, end, diff in merged_zones:
-            color_intensity = min(max(diff / max([d[2] for d in merged_zones]), 0.1), 1)  # Scale between 0.1 and 1 for better visibility
+            color_intensity = 1
             color = 'yellow'
             fig.add_shape(type="rect",
                           x0=well_data_smoothed.min(), x1=well_data_smoothed.max(),  # Use the range of the GR log
@@ -149,7 +149,7 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
 
     # Final layout
     fig.update_layout(
-        title=f'Gamma Ray Log Predictions for Selected Wells',
+        title=f'Formation tops detection based on GR log',
         height=1600,  # Make the plot longer
         xaxis_title='Gamma Ray (gr_n)',
         yaxis_title='Depth',
