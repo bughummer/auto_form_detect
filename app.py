@@ -59,7 +59,7 @@ def predict_lstm(model, X, scaler):
     return predictions_inverse
 
 # Main function to load model, make predictions, identify zones of interest, and visualize the results
-def main(df, well_name, look_back=50, mean_multiplier=0.5, merge_threshold=10, thickness_threshold=3):
+def main(df, well_name, look_back=50, mean_multiplier=1, merge_threshold=10, thickness_threshold=1):
     # Load the data
     well_data = df[df['wellname'] == well_name].copy()
 
