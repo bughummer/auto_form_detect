@@ -65,8 +65,11 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
         st.warning("Please select at least one well.")
         return
 
+    num_wells = len(selected_wells)
+    column_widths = [1.0 / num_wells] * num_wells
+
     # Create subplots with one column per well, and shared y-axis for depth
-    fig = make_subplots(rows=1, cols=len(selected_wells), shared_yaxes=True, subplot_titles=selected_wells)
+    fig = make_subplots(rows=1, cols=num_wells, shared_yaxes=True, subplot_titles=selected_wells, column_widths=column_widths)
 
     for index, well_name in enumerate(selected_wells):
         # Load the data
