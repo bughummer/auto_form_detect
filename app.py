@@ -60,6 +60,7 @@ def predict_lstm(model, X, scaler):
     return predictions_inverse
 
 # Main function to load model, make predictions, identify zones of interest, and visualize the results
+# Main function to load model, make predictions, identify zones of interest, and visualize the results
 def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=10, thickness_threshold=3):
     # Create subplots with one column per well
     fig = make_subplots(rows=1, cols=len(selected_wells), shared_yaxes=True, subplot_titles=selected_wells)
@@ -133,14 +134,15 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
         fig.add_trace(go.Scatter(x=combined_predictions, y=well_data['tvd_scs'][look_back:], mode='lines', name=f'{well_name} - Combined Cutoff', line=dict(color='red', dash='dash')),
                       row=1, col=index+1)
 
-        # Highlight zones of interest with varying colors based on the difference
+        # Highlight zones of interest using add_shape instead of add_vrect
         for start, end, diff in merged_zones:
             color_intensity = min(max(diff / max([d[2] for d in merged_zones]), 0.1), 1)  # Scale between 0.1 and 1 for better visibility
             color = 'yellow'
-            fig.add_vrect(y0=start, y1=end, fillcolor=color, opacity=color_intensity, line_width=0,
-                          xref=f'x{index+1}', yref=f'y',  # Reference the specific subplot's x-axis
-                          annotation_text=f'Zone {index+1}', annotation_position="top left")
-
+            fig.add_shape(type="rect",
+                          x0=0, x1=1,  # Use the full width of the subplot
+                          y0=start, y1=end,
+                          fillcolor=color, opacity=color_intensity, line_width=0,
+                          xref=f'x{index+1} domain', yref=f'y domain')  # Reference the specific subplot's domain
 
     # Final layout
     fig.update_layout(
@@ -153,6 +155,7 @@ def main(df, selected_wells, look_back=50, mean_multiplier=0.5, merge_threshold=
     )
 
     st.plotly_chart(fig)
+
 
 # Streamlit app interface
 def streamlit_app():
